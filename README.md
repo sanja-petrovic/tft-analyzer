@@ -10,7 +10,7 @@
 - Poetry
 
 ## Running instructions
-### Starting Kafka
+### Starting Kafka (necessary for streaming jobs)
 ```
 docker compose up
 ```

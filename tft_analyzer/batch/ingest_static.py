@@ -13,7 +13,23 @@ class StaticIngestion(Job):
         items_df: DataFrame = self.reader.read_json("items").select("id", "name")
         augments_df: DataFrame = self.reader.read_json("augments").select("id", "name")
 
-        self.writer.write(champions_df, "bronze.champions")
-        self.writer.write(traits_df, "bronze.traits")
-        self.writer.write(items_df, "bronze.items")
-        self.writer.write(augments_df, "bronze.augments")
+        self.writer.write(
+            champions_df,
+            "bronze.champions",
+            mode="overwrite",
+        )
+        self.writer.write(
+            traits_df,
+            "bronze.traits",
+            mode="overwrite",
+        )
+        self.writer.write(
+            items_df,
+            "bronze.items",
+            mode="overwrite",
+        )
+        self.writer.write(
+            augments_df,
+            "bronze.augments",
+            mode="overwrite",
+        )
