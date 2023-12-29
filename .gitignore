@@ -1,0 +1,8 @@
+__pycache__/
+.vscode
+.secrets.*
+.env
+dist/
+.mypy_cache
+build/
+/spark-warehouse
