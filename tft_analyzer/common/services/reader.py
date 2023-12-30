@@ -16,15 +16,11 @@ class Reader:
 
     def read_json(self, file: str) -> DataFrame:
         logger.info(f"Started reading {file} JSON...")
-
-        current_working_directory = os.getcwd()
-
-        # print output to the console
-        logger.info(current_working_directory)
-        df: DataFrame = (
-            self.spark_manager.spark.read.option("multiline", "true")
-            .json(f"./data/tft-{file}.json")
-            .cache()
+        for path, subdirs, files in os.walk(os.getcwd()):
+            for name in files:
+                print(os.path.join(path, name))
+        df: DataFrame = self.spark_manager.spark.read.option("multiline", "true").json(
+            "./data/tft-champions.json"
         )
         logger.info(f"Finished reading {file} JSON.")
         return df.selectExpr(f"inline({file})")

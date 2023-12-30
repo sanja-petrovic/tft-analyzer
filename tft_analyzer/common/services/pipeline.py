@@ -73,5 +73,14 @@ class Pipeline:
                 return None
 
     def run(self):
-        if self.job:
-            self.job.run()
+        # Sample data
+        data = [("John", 25), ("Alice", 30), ("Bob", 22)]
+
+        # Define the schema
+        schema = ["Name", "Age"]
+
+        # Create a DataFrame
+        df = self.spark_manager.spark.createDataFrame(data, schema=schema)
+
+        # Show the DataFrame
+        df.show()

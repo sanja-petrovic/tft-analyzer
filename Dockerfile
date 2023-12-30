@@ -10,6 +10,8 @@ ENV POETRY_VERSION=1.6.1
 ENV POETRY_HOME=/opt/poetry
 ENV POETRY_VENV=/opt/poetry-venv
 ENV POETRY_CACHE_DIR=/opt/.cache
+ENV PYSPARK_PYTHON=/usr/bin/python3.10
+ENV PYSPARK_DRIVER_PYTHON=/usr/bin/python3.10
 
 RUN python3 -m venv $POETRY_VENV \
     && $POETRY_VENV/bin/pip install -U pip setuptools \
@@ -21,6 +23,5 @@ WORKDIR /app
 
 COPY poetry.lock pyproject.toml ./
 RUN poetry install
-COPY /data /app/data
 COPY . /app
-CMD [ "poetry", "run", "dev", "run", "-j", "ingest-static"]
+CMD ["poetry", "run", "dev", "run", "-j", "ingest-static"]
