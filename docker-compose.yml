@@ -4,6 +4,13 @@
 version: '2'
 
 services:
+  analyzer: 
+    build: .
+    ports:
+      - '8000:8000'
+    depends_on:
+      - spark
+  
   spark:
     image: docker.io/bitnami/spark:3.5
     environment:

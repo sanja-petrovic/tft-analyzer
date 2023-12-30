@@ -7,6 +7,7 @@ from pyspark.sql.functions import col, expr
 from tft_analyzer.common.constants.constants import BROKER_URL
 from tft_analyzer.common.services.schema_registry import SchemaRegistry
 from tft_analyzer.common.services.spark_manager import SparkManager
+import os
 
 
 class Reader:
@@ -15,6 +16,11 @@ class Reader:
 
     def read_json(self, file: str) -> DataFrame:
         logger.info(f"Started reading {file} JSON...")
+
+        current_working_directory = os.getcwd()
+
+        # print output to the console
+        logger.info(current_working_directory)
         df: DataFrame = (
             self.spark_manager.spark.read.option("multiline", "true")
             .json(f"./data/tft-{file}.json")
