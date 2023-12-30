@@ -2,6 +2,8 @@ from __future__ import annotations
 
 
 import click
+from tft_analyzer.batch.ingest_matches import MatchIngestion
+from tft_analyzer.batch.ingest_players import PlayerIngestion
 from tft_analyzer.batch.ingest_static import StaticIngestion
 from tft_analyzer.common.services.reader import Reader
 from tft_analyzer.common.services.spark_manager import SparkManager
@@ -69,8 +71,8 @@ class Pipeline:
         match self.job_type:
             case "ingest-static":
                 return StaticIngestion(self.input, self.output)
-            case _:
-                return None
+            case "ingest":
+                return MatchIngestion()
 
     def run(self):
         if self.job:

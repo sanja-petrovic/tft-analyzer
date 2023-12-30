@@ -15,17 +15,15 @@ class Reader:
 
     def read_json(self, file: str) -> DataFrame:
         logger.info(f"Started reading {file} JSON...")
-        df: DataFrame = (
-            self.spark_manager.spark.read.option("multiline", "true")
-            .json(f"./data/tft-{file}.json")
-            .cache()
+        df: DataFrame = self.spark_manager.spark.read.option("multiline", "true").json(
+            f"./data/tft-{file}.json"
         )
         logger.info(f"Finished reading {file} JSON.")
         return df.selectExpr(f"inline({file})")
 
     def read_delta(self, table: str) -> DataFrame:
         logger.info(f'Started reading from "{table}"...')
-        df: DataFrame = self.spark_manager.spark.read.table(table)
+        df: DataFrame = self.spark_manager.spark.read.format("delta").table(table)
         logger.info(f'Finished reading from "{table}".')
         return df
 

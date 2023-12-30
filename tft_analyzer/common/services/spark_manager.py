@@ -18,6 +18,8 @@ class SparkManager:
                 "spark.sql.catalog.spark_catalog",
                 "org.apache.spark.sql.delta.catalog.DeltaCatalog",
             )
+            .config("spark.sql.warehouse.dir", "./spark-warehouse")
+            .enableHiveSupport()
             .getOrCreate()
         )
 
