@@ -21,13 +21,13 @@ class MatchIngestion(Job):
 
     def get_match_ids(self, puuid):
         match_ids = requests.get(
-            f"https://europe.api.riotgames.com/tft/match/v1/matches/by-puuid/{puuid}/ids?start=0&count=20&api_key=RGAPI-546d27a6-f1f9-495d-be79-d0f58206d9a9"
+            f"https://europe.api.riotgames.com/tft/match/v1/matches/by-puuid/{puuid}/ids?start=0&count=20&api_key=secret"
         )
 
         return match_ids.json()
 
     def get_match_history(self, match_id):
         match_history = requests.get(
-            f"https://europe.api.riotgames.com/tft/match/v1/matches/{match_id}?api_key=RGAPI-546d27a6-f1f9-495d-be79-d0f58206d9a9"
+            f"https://europe.api.riotgames.com/tft/match/v1/matches/{match_id}?api_key=secret"
         )
         return match_history.json()

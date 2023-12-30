@@ -23,7 +23,7 @@ class PlayerIngestion(Job):
 
     def make_request(self, tier: str, division: str, page: int):
         players = requests.get(
-            f"https://euw1.api.riotgames.com/tft/league/v1/entries/{tier}/{division}?queue=RANKED_TFT&page={page}&api_key=RGAPI-546d27a6-f1f9-495d-be79-d0f58206d9a9"
+            f"https://euw1.api.riotgames.com/tft/league/v1/entries/{tier}/{division}?queue=RANKED_TFT&page={page}&api_key=secret"
         )
         return players.json()
 

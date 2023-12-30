@@ -19,6 +19,7 @@ class SparkManager:
                 "org.apache.spark.sql.delta.catalog.DeltaCatalog",
             )
             .config("spark.sql.warehouse.dir", "./spark-warehouse")
+            .config("hive.metastore.uris", "thrift://hive-metastore:9083")
             .enableHiveSupport()
             .getOrCreate()
         )

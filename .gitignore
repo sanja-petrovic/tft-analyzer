@@ -7,3 +7,4 @@ dist/
 build/
 /spark-warehouse
 metastore_db
+conf.dist
