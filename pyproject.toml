@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pyspark = "^3.5.0"
+pyspark = "3.3.0"
 pytest = "^7.4.2"
 Faker = "^19.11.0"
 tqdm = "^4.66.1"
@@ -19,11 +19,11 @@ pandarallel = "^1.6.1"
 pyarrow = "^7.0.0"
 dynaconf = "^3.2.3"
 loguru = "^0.7.2"
-delta-spark = "^3.0.0"
 confluent-kafka = "^2.3.0"
 requests = "^2.31.0"
 fastavro = "^1.9.0"
 click = "^8.1.7"
+delta-spark = "2.3.0"
 
 
 [build-system]

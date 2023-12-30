@@ -4,7 +4,7 @@ from pyspark.sql import SparkSession
 class SparkManager:
     def __init__(self) -> None:
         self.spark: SparkSession = (
-            SparkSession.builder.master("spark://spark:7077")
+            SparkSession.builder.master("spark://localhost:7077")
             .config("spark.driver.extraJavaOptions", "-Duser.timezone=GMT")
             .config("spark.executor.extraJavaOptions", "-Duser.timezone=GMT")
             .config("spark.sql.session.timeZone", "UTC")
