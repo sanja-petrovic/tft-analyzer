@@ -188,13 +188,13 @@ schema-registry = ["requests"]
 
 [[package]]
 name = "delta-spark"
-version = "2.3.0"
+version = "2.2.0"
 description = "Python APIs for using Delta Lake with Apache Spark"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "delta-spark-2.3.0.tar.gz", hash = "sha256:c0884bb9a97f83381bbbd8742ca9054b439ea883ef12ae6a292a3597520adc55"},
-    {file = "delta_spark-2.3.0-py3-none-any.whl", hash = "sha256:008618feed655c96f13a04922a28e9d7b14a24a654c59a4fb58e21a0a06365d0"},
+    {file = "delta-spark-2.2.0.tar.gz", hash = "sha256:8a22b75c21aafe0d5d05e38be012b932d48441465a19c49ac658136afdee0933"},
+    {file = "delta_spark-2.2.0-py3-none-any.whl", hash = "sha256:0d3194ac5ff91746c7f8d480fd99211e7edfab6e9b7b5f464527702d34cd427b"},
 ]
 
 [package.dependencies]
@@ -791,4 +791,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "5acee6e72630f78823898fda3b025d26ae542579db7ce2564a88c17b3d3aa0fd"
+content-hash = "3d2a803adf1000f44fdec9cac100c5d0da31052572f2740109712662ad800b91"

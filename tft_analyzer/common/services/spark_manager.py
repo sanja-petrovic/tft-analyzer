@@ -4,13 +4,13 @@ from pyspark.sql import SparkSession
 class SparkManager:
     def __init__(self) -> None:
         self.spark: SparkSession = (
-            SparkSession.builder.master("spark://localhost:7077")
+            SparkSession.builder.master("spark://spark-master:7077")
             .config("spark.driver.extraJavaOptions", "-Duser.timezone=GMT")
             .config("spark.executor.extraJavaOptions", "-Duser.timezone=GMT")
             .config("spark.sql.session.timeZone", "UTC")
             .config(
                 "spark.jars.packages",
-                "io.delta:delta-spark_2.12:3.0.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.0,org.apache.spark:spark-avro_2.12:3.5.0",
+                "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0",
             )
             .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
             .config(
@@ -19,6 +19,7 @@ class SparkManager:
             )
             .config("spark.sql.warehouse.dir", "./spark-warehouse")
             .config("hive.metastore.uris", "thrift://hive-metastore:9083")
+            .config("spark.pyspark.python", "python3")
             .enableHiveSupport()
             .getOrCreate()
         )

@@ -23,7 +23,7 @@ confluent-kafka = "^2.3.0"
 requests = "^2.31.0"
 fastavro = "^1.9.0"
 click = "^8.1.7"
-delta-spark = "2.3.0"
+delta-spark = "2.2.0"
 
 
 [build-system]

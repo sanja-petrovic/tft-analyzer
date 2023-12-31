@@ -68,21 +68,8 @@ class Pipeline:
         self.job = self.get_job()
 
     def get_job(self):
-        match self.job_type:
-            case "ingest-static":
-                return StaticIngestion(self.input, self.output)
-            case "ingest":
-                return MatchIngestion()
+        return StaticIngestion(self.input, self.output)
 
     def run(self):
-        # Sample data
-        data = [("John", 25), ("Alice", 30), ("Bob", 22)]
-
-        # Define the schema
-        schema = ["Name", "Age"]
-
-        # Create a DataFrame
-        df = self.spark_manager.spark.createDataFrame(data, schema=schema)
-
-        # Show the DataFrame
-        df.show()
+        if self.job:
+            return self.job.run()
