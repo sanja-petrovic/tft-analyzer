@@ -1,15 +1,18 @@
-FROM python:3.10
+FROM python:3.9
 
-COPY --from=openjdk:8-jre-slim /usr/local/openjdk-8 /usr/local/openjdk-8
+COPY --from=openjdk:11 /usr/local/openjdk-11 /usr/local/openjdk-11
 
-ENV JAVA_HOME /usr/local/openjdk-8
+ENV JAVA_HOME /usr/local/openjdk-11
 
-RUN update-alternatives --install /usr/bin/java java /usr/local/openjdk-8/bin/java 1
+RUN update-alternatives --install /usr/bin/java java /usr/local/openjdk-11/bin/java 1
 
 ENV POETRY_VERSION=1.6.1
 ENV POETRY_HOME=/opt/poetry
 ENV POETRY_VENV=/opt/poetry-venv
 ENV POETRY_CACHE_DIR=/opt/.cache
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+ENV PYSPARK_MAJOR_PYTHON_VERSION=3
 
 RUN python3 -m venv $POETRY_VENV \
     && $POETRY_VENV/bin/pip install -U pip setuptools \
