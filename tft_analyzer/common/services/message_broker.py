@@ -9,10 +9,10 @@ from confluent_kafka.serialization import (
     StringSerializer,
 )
 from loguru import logger
-from tft_analyzer.common.constants.constants import BROKER_URL
+from common.constants.constants import BROKER_URL
 
-from tft_analyzer.common.services.schema_registry import SchemaRegistry
-from tft_analyzer.stream.log_entry import LogEntry
+from common.services.schema_registry import SchemaRegistry
+from stream.log_entry import LogEntry
 
 
 class MessageBroker:

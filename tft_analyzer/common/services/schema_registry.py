@@ -1,5 +1,5 @@
 from confluent_kafka.schema_registry import Schema, SchemaRegistryClient
-from tft_analyzer.common.constants.constants import SCHEMA_REGISTRY_URL
+from common.constants.constants import SCHEMA_REGISTRY_URL
 
 
 class SchemaRegistry:

@@ -1,5 +1,6 @@
 import click
-from tft_analyzer.common.services.pipeline import run
+
+from common.services.pipeline import run
 
 
 @click.group()

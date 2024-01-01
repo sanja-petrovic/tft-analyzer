@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 
-from tft_analyzer.common.services.reader import Reader
-from tft_analyzer.common.services.spark_manager import SparkManager
-from tft_analyzer.common.services.transformer import Transformer
-from tft_analyzer.common.services.writer import Writer
+from common.services.reader import Reader
+from common.services.spark_manager import SparkManager
+from common.services.transformer import Transformer
+from common.services.writer import Writer
 
 
 class Job:

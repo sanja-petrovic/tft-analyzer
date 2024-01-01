@@ -4,9 +4,9 @@ from loguru import logger
 from pyspark.sql import DataFrame
 from pyspark.sql.avro.functions import from_avro
 from pyspark.sql.functions import col, expr
-from tft_analyzer.common.constants.constants import BROKER_URL
-from tft_analyzer.common.services.schema_registry import SchemaRegistry
-from tft_analyzer.common.services.spark_manager import SparkManager
+from common.constants.constants import BROKER_URL
+from common.services.schema_registry import SchemaRegistry
+from common.services.spark_manager import SparkManager
 
 
 class Reader:

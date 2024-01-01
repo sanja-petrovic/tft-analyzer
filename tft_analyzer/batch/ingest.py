@@ -1,6 +1,6 @@
-from tft_analyzer.common.services.job import Job
-
 from pyspark.sql import DataFrame
+
+from common.services.job import Job
 
 
 class Ingestion(Job):

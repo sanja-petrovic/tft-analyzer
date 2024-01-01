@@ -1,6 +1,6 @@
 import requests
 
-from tft_analyzer.common.services.job import Job
+from common.services.job import Job
 
 import json
 

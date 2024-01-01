@@ -2,13 +2,13 @@ from __future__ import annotations
 
 
 import click
-from tft_analyzer.batch.ingest_matches import MatchIngestion
-from tft_analyzer.batch.ingest_players import PlayerIngestion
-from tft_analyzer.batch.ingest_static import StaticIngestion
-from tft_analyzer.common.services.reader import Reader
-from tft_analyzer.common.services.spark_manager import SparkManager
-from tft_analyzer.common.services.transformer import Transformer
-from tft_analyzer.common.services.writer import Writer
+from batch.ingest_matches import MatchIngestion
+from batch.ingest_players import PlayerIngestion
+from batch.ingest_static import StaticIngestion
+from common.services.reader import Reader
+from common.services.spark_manager import SparkManager
+from common.services.transformer import Transformer
+from common.services.writer import Writer
 
 
 @click.command()

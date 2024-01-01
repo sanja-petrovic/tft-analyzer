@@ -1,4 +1,4 @@
-from tft_analyzer.common.services.spark_manager import SparkManager
+from common.services.spark_manager import SparkManager
 
 
 class Transformer:
