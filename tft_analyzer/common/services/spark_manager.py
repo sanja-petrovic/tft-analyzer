@@ -1,5 +1,6 @@
 from pyspark.sql import SparkSession
 from loguru import logger
+from pyspark.sql.functions import col
 
 
 class SparkManager:
@@ -34,5 +35,6 @@ class SparkManager:
     def create_schema(self, schema: str) -> None:
         self.spark.sql(f"CREATE SCHEMA IF NOT EXISTS {schema}")
 
-    def table_exists(self, table) -> None:
-        return self.spark.catalog.tableExists(table)
+    def table_exists(self, table, db) -> None:
+        result = self.spark.sql(f"SHOW TABLES IN {db}")
+        return bool(result.filter(col("tableName").contains(table)).collect())

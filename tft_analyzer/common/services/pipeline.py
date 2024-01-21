@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import click
 from batch.ingest_matches import MatchIngestion
+from batch.preprocess import Preprocessing
 from batch.ingest_players import PlayerIngestion
 from batch.ingest_static import StaticIngestion
 from common.services.reader import Reader
@@ -64,7 +65,7 @@ class Pipeline:
         self.api_handler = RiotApiHandler()
         self.reader = Reader(self.spark_manager)
         self.transformer = Transformer(self.spark_manager)
-        self.writer = Writer()
+        self.writer = Writer(self.spark_manager)
         self.input = input
         self.output = output
         self.mode = mode
@@ -78,6 +79,8 @@ class Pipeline:
             return PlayerIngestion(self.api_handler, self.input, self.output)
         elif self.job_type == "ingest-matches":
             return MatchIngestion(self.api_handler, self.input, self.output)
+        elif self.job_type == "transform":
+            return Preprocessing(self.input, self.output)
         else:
             return None
 

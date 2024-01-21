@@ -15,7 +15,7 @@ class Job:
         self.spark_manager = SparkManager()
         self.reader = Reader(self.spark_manager)
         self.transformer = Transformer(self.spark_manager)
-        self.writer = Writer()
+        self.writer = Writer(self.spark_manager)
         self.input = input
         self.output = output
 

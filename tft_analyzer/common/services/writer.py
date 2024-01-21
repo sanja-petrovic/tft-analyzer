@@ -5,9 +5,13 @@ from loguru import logger
 from pyspark.sql import DataFrame
 
 from typing import Union
+from common.services.spark_manager import SparkManager
 
 
 class Writer:
+    def __init__(self, spark_manager: SparkManager) -> Writer:
+        self.spark_manager = spark_manager
+
     def write(
         self,
         df: DataFrame,
@@ -35,6 +39,28 @@ class Writer:
             condition,
         ).whenNotMatchedInsertAll().whenMatchedUpdateAll().execute()
         logger.info(f'Finished upserting to Delta table "{existing_alias}".')
+
+    def write_or_upsert(
+        self,
+        df: DataFrame,
+        table_name: str,
+        id_column: str,
+        partition_by: Union[str, None] = None,
+    ):
+        splitted = table_name.split(".")
+        if self.spark_manager.table_exists(splitted[1], splitted[0]):
+            existing_silver: DeltaTable = DeltaTable.convertToDelta(
+                self.spark_manager.spark, table_name
+            )
+            self.upsert(
+                "new_silver",
+                table_name,
+                df,
+                existing_silver,
+                f"new_silver.{id_column} = `{table_name}`.{id_column}",
+            )
+        else:
+            self.write(df, table_name, partition_by=partition_by)
 
     def write_stream(
         self,
