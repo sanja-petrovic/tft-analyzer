@@ -35,3 +35,4 @@ ua-parser
 urllib3
 win32-setctime
 zipp
+apache-airflow==2.6.3
