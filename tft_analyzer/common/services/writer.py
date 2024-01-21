@@ -44,7 +44,7 @@ class Writer:
         self,
         df: DataFrame,
         table_name: str,
-        id_column: str,
+        condition: str,
         partition_by: Union[str, None] = None,
     ):
         splitted = table_name.split(".")
@@ -57,7 +57,7 @@ class Writer:
                 table_name,
                 df,
                 existing_silver,
-                f"new_silver.{id_column} = `{table_name}`.{id_column}",
+                condition,
             )
         else:
             self.write(df, table_name, partition_by=partition_by)

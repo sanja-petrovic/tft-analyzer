@@ -15,4 +15,4 @@ COPY requirements.txt ./
 RUN pip install -r requirements.txt
 COPY /data /app/data
 COPY . /app
-CMD ["python3", "tft_analyzer/main.py", "run", "-j", "transform", "-i", "bronze.players", "-o", "silver.players"]
+CMD ["python3", "tft_analyzer/main.py", "run", "-j", "transform", "-i", "bronze.champions", "-o", "silver.champions"]
