@@ -4,6 +4,8 @@ from delta import DeltaTable
 from loguru import logger
 from pyspark.sql import DataFrame
 
+from typing import Union
+
 
 class Writer:
     def write(
@@ -11,7 +13,7 @@ class Writer:
         df: DataFrame,
         table: str,
         mode: str = "append",
-        partition_by: str | None = None,
+        partition_by: Union[str, None] = None,
     ) -> None:
         logger.info(f'Started writing to Delta table "{table}"...')
         df.write.format("delta").option("overwriteSchema", "true").saveAsTable(
@@ -38,7 +40,7 @@ class Writer:
         self,
         df: DataFrame,
         table: str,
-        partition_by: str | None = None,
+        partition_by: Union[str, None] = None,
         mode: str = "append",
     ) -> None:
         df.writeStream.format("delta").outputMode(mode).option(

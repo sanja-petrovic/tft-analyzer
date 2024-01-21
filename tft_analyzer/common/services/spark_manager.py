@@ -1,10 +1,12 @@
 from pyspark.sql import SparkSession
+from loguru import logger
 
 
 class SparkManager:
     def __init__(self) -> None:
         self.spark: SparkSession = (
             SparkSession.builder.master("spark://spark-master:7077")
+            .appName("tft-analyzer")
             .config("spark.driver.extraJavaOptions", "-Duser.timezone=GMT")
             .config("spark.executor.extraJavaOptions", "-Duser.timezone=GMT")
             .config("spark.sql.session.timeZone", "UTC")

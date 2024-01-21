@@ -9,6 +9,7 @@ from common.services.reader import Reader
 from common.services.spark_manager import SparkManager
 from common.services.transformer import Transformer
 from common.services.writer import Writer
+from common.services.riot_api_handler import RiotApiHandler
 
 
 @click.command()
@@ -23,7 +24,9 @@ from common.services.writer import Writer
 @click.option(
     "-j",
     "--job_type",
-    type=click.Choice(["ingest-static", "ingest", "transform", "aggregate"]),
+    type=click.Choice(
+        ["ingest-static", "ingest-players", "ingest-matches", "transform", "aggregate"]
+    ),
     help="Job type.",
 )
 @click.option(
@@ -58,6 +61,7 @@ class Pipeline:
         output: str,
     ) -> None:
         self.spark_manager = SparkManager()
+        self.api_handler = RiotApiHandler()
         self.reader = Reader(self.spark_manager)
         self.transformer = Transformer(self.spark_manager)
         self.writer = Writer()
@@ -68,7 +72,14 @@ class Pipeline:
         self.job = self.get_job()
 
     def get_job(self):
-        return StaticIngestion(self.input, self.output)
+        if self.job_type == "ingest-static":
+            return StaticIngestion(self.input, self.output)
+        elif self.job_type == "ingest-players":
+            return PlayerIngestion(self.api_handler, self.input, self.output)
+        elif self.job_type == "ingest-matches":
+            return MatchIngestion(self.api_handler, self.input, self.output)
+        else:
+            return None
 
     def run(self):
         if self.job:

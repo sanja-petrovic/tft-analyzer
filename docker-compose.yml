@@ -4,6 +4,7 @@ services:
 
   analyzer:
     build: .
+    container_name: tft-analyzer
     ports:
       - "8000:8000"
     volumes:
@@ -11,6 +12,8 @@ services:
       - ./spark-warehouse:/app/spark-warehouse
     depends_on:
       - spark-master
+    env_file:
+      - ./tft.env
 
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
@@ -90,6 +93,10 @@ services:
       - SPARK_WORKER_CORES = 4
       - PYSPARK_PYTHON=python3
 
+  hive-metastore-postgresql:
+    image: bde2020/hive-metastore-postgresql:2.3.0
+    container_name: hive-metastore-postgresql
+
   hive-server:
     image: bde2020/hive:2.3.2-postgresql-metastore
     container_name: hive-server
@@ -114,18 +121,6 @@ services:
       SERVICE_PRECONDITION: "namenode:9000 datanode:9864 hive-metastore-postgresql:5432"
     ports:
       - "9083:9083"
-  
-  hue:
-    image: gethue/hue:20201111-135001
-    hostname: hue
-    container_name: hue
-    dns: 8.8.8.8
-    ports:
-      - "8888:8888"
-    volumes:
-      - ./conf.dist:/usr/share/hue/desktop/conf
-    depends_on: 
-      - namenode
 
   resourcemanager:
     image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
