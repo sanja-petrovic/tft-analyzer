@@ -9,66 +9,43 @@ class Transformer:
     def calculate_trait_metrics(self, df):
         filtered_df = df.filter(col("trait_tier") > 0)
         total_matches_per_trait = filtered_df.groupBy("trait_id", "trait_tier").agg(
-            self.calculate_matches_per_entity,
-            self.calculate_top_4_matches,
-            self.calculate_top_1_matches,
+            count("match_id").alias("total_matches"),
+            count(when(col("placement") <= 4, True)).alias("top_4_matches"),
+            count(when(col("placement") == 1, True)).alias("top_1_matches"),
         )
-        metrics_df = (
-            total_matches_per_trait.groupBy("trait_id", "trait_tier")
-            .withColumn(
-                "pick_rate",
+        metrics_df = total_matches_per_trait.groupBy(
+            "trait_id", "trait_tier", "total_matches", "top_4_matches", "top_1_matches"
+        ).agg(
+            (
                 round(
-                    col("total_matches") / df.select("match_id").distinct().count(), 4
+                    col("total_matches") / df.select("match_id").count(),
+                    4,
                 )
-                * 100,
-            )
-            .withColumn(
-                "top_4_rate",
-                col("top_4_matches") / col("total_matches") * 100,
-            )
-            .fillna(0)
-            .withColumn(
-                "top_1_rate",
-                col("top_1_matches") / col("total_matches") * 100,
-            )
-            .fillna(0)
+                * 100
+            ).alias("pick_rate"),
+            (col("top_4_matches") / col("total_matches") * 100).alias("top_4_rate"),
+            (col("top_1_matches") / col("total_matches") * 100).alias("top_1_rate"),
         )
         return metrics_df
 
-    def calculate_matches_per_entity(self):
-        return count("match_id").alias("total_matches")
-
-    def calculate_top_4_matches(self):
-        return count(when(col("placement") <= 4, True)).alias("top_4_matches")
-
-    def calculate_top_1_matches(self):
-        return count(when(col("placement") == 1, True)).alias("top_1_matches")
-
     def calculate_champion_metrics(self, df):
-        total_matches_per_champion = df.groupBy("champion_id").agg(
-            self.calculate_matches_per_entity,
-            self.calculate_top_4_matches,
-            self.calculate_top_1_matches,
+        total_matches_per_champion = df.groupBy("unit_id").agg(
+            count("match_id").alias("total_matches"),
+            count(when(col("placement") <= 4, True)).alias("top_4_matches"),
+            count(when(col("placement") == 1, True)).alias("top_1_matches"),
         )
-        metrics_df = (
-            total_matches_per_champion.groupBy("champion_id")
-            .withColumn(
-                "pick_rate",
+        metrics_df = total_matches_per_champion.groupBy(
+            "unit_id", "total_matches", "top_4_matches", "top_1_matches"
+        ).agg(
+            (
                 round(
-                    col("total_matches") / df.select("match_id").distinct().count(), 4
+                    col("total_matches") / df.select("match_id").count(),
+                    4,
                 )
-                * 100,
-            )
-            .withColumn(
-                "top_4_rate",
-                col("top_4_matches") / col("total_matches") * 100,
-            )
-            .fillna(0)
-            .withColumn(
-                "top_1_rate",
-                col("top_1_matches") / col("total_matches") * 100,
-            )
-            .fillna(0)
+                * 100
+            ).alias("pick_rate"),
+            (col("top_4_matches") / col("total_matches") * 100).alias("top_4_rate"),
+            (col("top_1_matches") / col("total_matches") * 100).alias("top_1_rate"),
         )
         return metrics_df
 
