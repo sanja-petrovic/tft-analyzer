@@ -7,6 +7,7 @@ from batch.preprocess import Preprocessing
 from batch.ingest_players import PlayerIngestion
 from batch.ingest_static import StaticIngestion
 from batch.aggregate import Aggregation
+from stream.ingest_logs import LogIngestion
 from common.services.reader import Reader
 from common.services.spark_manager import SparkManager
 from common.services.transformer import Transformer
@@ -27,7 +28,14 @@ from common.services.riot_api_handler import RiotApiHandler
     "-j",
     "--job_type",
     type=click.Choice(
-        ["ingest-static", "ingest-players", "ingest-matches", "preprocess", "aggregate"]
+        [
+            "ingest-static",
+            "ingest-players",
+            "ingest-matches",
+            "ingest-logs",
+            "preprocess",
+            "aggregate",
+        ]
     ),
     help="Job type.",
 )
@@ -72,18 +80,24 @@ class Pipeline:
         self.job = self.get_job()
 
     def get_job(self):
-        if self.job_type == "ingest-static":
-            return StaticIngestion(self.input, self.output)
-        elif self.job_type == "ingest-players":
-            return PlayerIngestion(self.api_handler, self.input, self.output)
-        elif self.job_type == "ingest-matches":
-            return MatchIngestion(self.api_handler, self.num, self.input, self.output)
-        elif self.job_type == "preprocess":
-            return Preprocessing(self.input, self.output)
-        elif self.job_type == "aggregate":
-            return Aggregation(self.input, self.output)
+        if self.mode == "stream":
+            if self.job_type == "ingest-logs":
+                return LogIngestion()
         else:
-            return None
+            if self.job_type == "ingest-static":
+                return StaticIngestion(self.input, self.output)
+            elif self.job_type == "ingest-players":
+                return PlayerIngestion(self.api_handler, self.input, self.output)
+            elif self.job_type == "ingest-matches":
+                return MatchIngestion(
+                    self.api_handler, self.num, self.input, self.output
+                )
+            elif self.job_type == "preprocess":
+                return Preprocessing(self.input, self.output)
+            elif self.job_type == "aggregate":
+                return Aggregation(self.input, self.output)
+            else:
+                return None
 
     def run(self):
         if self.job:
