@@ -61,31 +61,27 @@ class Transformer:
         return (first_metrics, second_metrics, third_metrics)
 
     def calculate_augment_metrics(self, df, pick):
-        total_matches = df.groupBy(f"augment{pick}").agg(
-            self.calculate_matches_per_entity,
-            self.calculate_top_4_matches,
-            self.calculate_top_1_matches,
+        total_matches_per_augment = df.groupBy(f"augment{pick}").agg(
+            count("match_id").alias("total_matches"),
+            count(when(col("placement") <= 4, True)).alias("top_4_matches"),
+            count(when(col("placement") == 1, True)).alias("top_1_matches"),
         )
         metrics_df = (
-            total_matches.groupBy(f"augment{pick}")
-            .withColumn("pick_order", lit(pick))
-            .withColumn(
-                "pick_rate",
-                round(
-                    col("total_matches") / df.select("match_id").distinct().count(), 4
-                )
-                * 100,
+            total_matches_per_augment.groupBy(
+                f"augment{pick}", "total_matches", "top_4_matches", "top_1_matches"
             )
-            .withColumn(
-                "top_4_rate",
-                col("top_4_matches") / col("total_matches") * 100,
+            .agg(
+                (
+                    round(
+                        col("total_matches") / df.select("match_id").count(),
+                        4,
+                    )
+                    * 100
+                ).alias("pick_rate"),
+                (col("top_4_matches") / col("total_matches") * 100).alias("top_4_rate"),
+                (col("top_1_matches") / col("total_matches") * 100).alias("top_1_rate"),
             )
-            .fillna(0)
-            .withColumn(
-                "top_1_rate",
-                col("top_1_matches") / col("total_matches") * 100,
-            )
-            .fillna(0)
             .withColumnRenamed(f"augment{pick}", "augment_id")
+            .withColumn("pick_order", lit(pick))
         )
         return metrics_df
