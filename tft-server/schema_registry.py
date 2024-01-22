@@ -1,6 +1,6 @@
 from confluent_kafka.schema_registry import Schema, SchemaRegistryClient
 
-AVRO_SCHEMA = '{"type":"record","name":"logs","fields":[{"name":"timestamp","type":"string","default":"NONE"},{"name":"request_type","type":"string","default":"NONE"},{"name":"endpoint_path","type":"string","default":"NONE"},{"name":"status_code","type":"int","default":0},{"name":"response_size","type":"int","default":0},{"name":"response_time","type":"int","default":0}]}'
+AVRO_SCHEMA = '{"type":"record","name":"logs","fields":[{"name":"puuid","type":"string","default":"NONE"},{"name":"timestamp","type":"string","default":"NONE"},{"name":"request_type","type":"string","default":"NONE"},{"name":"endpoint_path","type":"string","default":"NONE"},{"name":"status_code","type":"int","default":0},{"name":"response_size","type":"int","default":0},{"name":"response_time","type":"int","default":0}]}'
 
 
 class SchemaRegistry:

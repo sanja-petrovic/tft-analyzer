@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 @dataclass
 class LogEntry:
+    puuid: str
     timestamp: datetime.datetime
     request_type: str
     endpoint_path: str
@@ -18,7 +19,7 @@ class LogEntry:
 
     def __str__(self) -> str:
         return (
-            f"{self.timestamp.isoformat()} {self.request_type} /{self.endpoint_path} "
+            f"{self.puuid} {self.timestamp.isoformat()} {self.request_type} /{self.endpoint_path} "
             f"{self.status_code} {self.response_size} "
             f"{self.response_time}"
         )
