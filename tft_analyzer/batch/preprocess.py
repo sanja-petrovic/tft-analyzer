@@ -28,7 +28,7 @@ class Preprocessing(Job):
             )
             partition_by = "tier"
 
-        if self.input == "bronze.match_history":
+        if self.input == "bronze.matches":
             partition_by = "outcome"
             df = df.dropDuplicates(["match_id", "puuid"])
             augments_df = df.select(
@@ -83,36 +83,39 @@ class Preprocessing(Job):
             self.writer.write_or_upsert(
                 augments_df,
                 "silver.match_augments",
-                "new_silver.match_id = `silver.match_augments`.match_id AND "
-                "new_silver.puuid = `silver.match_augments`.puuid",
+                "new_table.match_id = `silver.match_augments`.match_id AND "
+                "new_table.puuid = `silver.match_augments`.puuid",
             )
             self.writer.write_or_upsert(
                 traits_df,
                 "silver.match_traits",
-                "new_silver.match_id = `silver.match_traits`.match_id AND "
-                "new_silver.puuid = `silver.match_traits`.puuid AND "
-                "new_silver.trait_id = `silver.match_traits`.trait_id",
+                "new_table.match_id = `silver.match_traits`.match_id AND "
+                "new_table.puuid = `silver.match_traits`.puuid AND "
+                "new_table.trait_id = `silver.match_traits`.trait_id",
             )
             self.writer.write_or_upsert(
                 units_df,
                 "silver.match_units",
-                "new_silver.match_id = `silver.match_units`.match_id AND "
-                "new_silver.puuid = `silver.match_units`.puuid AND "
-                "new_silver.unit_id = `silver.match_units`.unit_id AND "
-                "new_silver.unit_tier = `silver.match_units`.unit_tier AND "
-                "new_silver.unit_item_1 = `silver.match_units`.unit_item_1 AND "
-                "new_silver.unit_item_2 = `silver.match_units`.unit_item_2 AND "
-                "new_silver.unit_item_3 = `silver.match_units`.unit_item_3 AND ",
+                "new_table.match_id = `silver.match_units`.match_id AND "
+                "new_table.puuid = `silver.match_units`.puuid AND "
+                "new_table.unit_id = `silver.match_units`.unit_id AND "
+                "new_table.unit_tier = `silver.match_units`.unit_tier AND "
+                "new_table.unit_item_1 = `silver.match_units`.unit_item_1 AND "
+                "new_table.unit_item_2 = `silver.match_units`.unit_item_2 AND "
+                "new_table.unit_item_3 = `silver.match_units`.unit_item_3 AND ",
             )
             self.writer.write_or_upsert(
                 df,
                 self.output,
-                f"new_silver.match_id = `silver.{self.output}.match_id AND "
-                f"new_silver.puuid = `silver.{self.output}.puuid",
+                f"new_table.match_id = `{self.output}`.match_id AND "
+                f"new_table.puuid = `{self.output}`.puuid",
                 partition_by,
             )
-        else:
-            df = df.dropDuplicates([id_column])
-            self.writer.write_or_upsert(
-                df, self.output, f"new_silver.{id_column} = `{self.output}`.{id_column}"
-            ), partition_by
+            return
+        df = df.dropDuplicates([id_column])
+        self.writer.write_or_upsert(
+            df,
+            self.output,
+            f"new_table.{id_column} = `{self.output}`.{id_column}",
+            partition_by,
+        )

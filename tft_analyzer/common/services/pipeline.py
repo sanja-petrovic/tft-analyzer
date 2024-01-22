@@ -6,6 +6,7 @@ from batch.ingest_matches import MatchIngestion
 from batch.preprocess import Preprocessing
 from batch.ingest_players import PlayerIngestion
 from batch.ingest_static import StaticIngestion
+from batch.aggregate import Aggregation
 from common.services.reader import Reader
 from common.services.spark_manager import SparkManager
 from common.services.transformer import Transformer
@@ -26,7 +27,7 @@ from common.services.riot_api_handler import RiotApiHandler
     "-j",
     "--job_type",
     type=click.Choice(
-        ["ingest-static", "ingest-players", "ingest-matches", "transform", "aggregate"]
+        ["ingest-static", "ingest-players", "ingest-matches", "preprocess", "aggregate"]
     ),
     help="Job type.",
 )
@@ -42,24 +43,21 @@ from common.services.riot_api_handler import RiotApiHandler
     type=str,
     help="The name of the output Delta table.",
 )
-def run(
-    mode: str,
-    job_type: str,
-    input: str,
-    output: str,
-):
+@click.option(
+    "-n",
+    "--num",
+    type=int,
+    help="Number of matches to ingest or preprocess.",
+)
+def run(mode: str, job_type: str, input: str, output: str, num: int):
     """Run pipeline."""
-    pipeline = Pipeline(mode, job_type, input, output)
+    pipeline = Pipeline(mode, job_type, input, output, num)
     pipeline.run()
 
 
 class Pipeline:
     def __init__(
-        self,
-        mode: str,
-        job_type: str,
-        input: str,
-        output: str,
+        self, mode: str, job_type: str, input: str, output: str, num: int
     ) -> None:
         self.spark_manager = SparkManager()
         self.api_handler = RiotApiHandler()
@@ -70,6 +68,7 @@ class Pipeline:
         self.output = output
         self.mode = mode
         self.job_type = job_type
+        self.num = num
         self.job = self.get_job()
 
     def get_job(self):
@@ -78,9 +77,11 @@ class Pipeline:
         elif self.job_type == "ingest-players":
             return PlayerIngestion(self.api_handler, self.input, self.output)
         elif self.job_type == "ingest-matches":
-            return MatchIngestion(self.api_handler, self.input, self.output)
-        elif self.job_type == "transform":
+            return MatchIngestion(self.api_handler, self.num, self.input, self.output)
+        elif self.job_type == "preprocess":
             return Preprocessing(self.input, self.output)
+        elif self.job_type == "aggregate":
+            return Aggregation(self.input, self.output)
         else:
             return None
 

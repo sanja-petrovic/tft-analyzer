@@ -53,7 +53,7 @@ class Writer:
                 self.spark_manager.spark, table_name
             )
             self.upsert(
-                "new_silver",
+                "new_table",
                 table_name,
                 df,
                 existing_silver,

@@ -45,7 +45,7 @@ class RiotApiHandler:
             timeout=15,
         )
         logger.info(
-            f"Finished requesting player [#{player_id}]'smatches from Riot's API."
+            f"Finished requesting player [#{player_id}]'s matches from Riot's API."
         )
 
         return match_ids.json()

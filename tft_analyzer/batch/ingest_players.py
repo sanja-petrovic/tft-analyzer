@@ -3,9 +3,10 @@ from pyspark.sql import DataFrame
 
 from batch.ingest_api import ApiIngestion
 from common.constants.constants import TIERS, DIVISIONS, HIGHER_TIERS
-from pyspark.sql.functions import lit, col
+from pyspark.sql.functions import lit, col, monotonically_increasing_id
 from pyspark.rdd import PipelinedRDD
 import time
+from pyspark.sql.types import StringType
 
 
 class PlayerIngestion(ApiIngestion):
@@ -17,8 +18,10 @@ class PlayerIngestion(ApiIngestion):
                     players: dict = self.api_handler.request_players(tier, division, i)
                     if not players:
                         break
-                    i += 1
                     self.save_players(players)
+                    if i == 3:
+                        break
+                    i += 1
                 time.sleep(10)
         # summoner_ids = []
         # for tier in HIGHER_TIERS:
@@ -47,4 +50,6 @@ class PlayerIngestion(ApiIngestion):
         ).map(lambda x: json.dumps(x))
         df: DataFrame = self.spark_manager.spark.read.json(rdd)
         df = df.filter(col("queueType") == "RANKED_TFT")
-        self.writer.write(df, "bronze.players", partition_by="tier")
+        df = df.withColumn("idx", monotonically_increasing_id())
+        df = df.withColumn("processedTime", lit(None).cast(StringType()))
+        self.writer.write(df, "bronze.players", mode="overwrite", partition_by="tier")

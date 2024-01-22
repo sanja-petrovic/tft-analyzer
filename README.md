@@ -23,7 +23,7 @@ poetry run dev run [parameters]
 Parameters:
 - `-i`, `--input`: The name of the input Delta table or Kafka topic (in case of an ingestion streaming job).
 - `-o`, `--output`: The name of the output Delta table.
-- `-j`, `--job`: Task to execute: `ingest-static`, `ingest`, `transform`, `aggregate`.
+- `-j`, `--job`: Task to execute: `ingest-static`, `ingest`, `preprocess`, `aggregate`.
 - `-m`, `--mode`: Processing mode (`batch` or `stream`).
 
 ## Architecture
