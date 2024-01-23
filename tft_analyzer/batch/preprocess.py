@@ -60,9 +60,7 @@ class Preprocessing(Job):
                     "placement",
                     "puuid",
                     "unit_id",
-                    col("unit_items").getItem(0).alias("unit_item_1"),
-                    col("unit_items").getItem(1).alias("unit_item_2"),
-                    col("unit_items").getItem(2).alias("unit_item_3"),
+                    explode_outer("unit_items").alias("item"),
                     "unit_tier",
                 )
             )

@@ -1,5 +1,6 @@
 from common.services.spark_manager import SparkManager
-from pyspark.sql.functions import col, count, when, round, lit
+from pyspark.sql.window import Window
+from pyspark.sql.functions import col, count, when, round, lit, avg, desc, row_number
 
 
 class Transformer:
@@ -29,13 +30,13 @@ class Transformer:
         return metrics_df
 
     def calculate_champion_metrics(self, df):
-        total_matches_per_champion = df.groupBy("unit_id").agg(
+        total_matches_per_champion = df.groupBy("unit_id", "unit_tier").agg(
             count("match_id").alias("total_matches"),
             count(when(col("placement") <= 4, True)).alias("top_4_matches"),
             count(when(col("placement") == 1, True)).alias("top_1_matches"),
         )
         metrics_df = total_matches_per_champion.groupBy(
-            "unit_id", "total_matches", "top_4_matches", "top_1_matches"
+            "unit_id", "unit_tier", "total_matches", "top_4_matches", "top_1_matches"
         ).agg(
             (
                 round(
@@ -85,3 +86,90 @@ class Transformer:
             .withColumn("pick_order", lit(pick))
         )
         return metrics_df
+
+    def calculate_item_metrics(self, df):
+        total_matches_per_item = df.groupBy("item").agg(
+            count("match_id").alias("total_matches"),
+            count(when(col("placement") <= 4, True)).alias("top_4_matches"),
+            count(when(col("placement") == 1, True)).alias("top_1_matches"),
+        )
+        metrics_df = total_matches_per_item.groupBy(
+            "item", "total_matches", "top_4_matches", "top_1_matches"
+        ).agg(
+            (
+                round(
+                    col("total_matches") / df.select("match_id").count(),
+                    4,
+                )
+                * 100
+            ).alias("pick_rate"),
+            (col("top_4_matches") / col("total_matches") * 100).alias("top_4_rate"),
+            (col("top_1_matches") / col("total_matches") * 100).alias("top_1_rate"),
+        )
+        return metrics_df
+
+    def calculate_champion_item_metrics(self, df):
+        total_matches_per_champion_and_item = df.groupBy("unit_id", "item").agg(
+            count("match_id").alias("total_matches"),
+            count(when(col("placement") <= 4, True)).alias("top_4_matches"),
+            count(when(col("placement") == 1, True)).alias("top_1_matches"),
+        )
+        metrics_df = total_matches_per_champion_and_item.groupBy(
+            "unit_id", "item", "total_matches", "top_4_matches", "top_1_matches"
+        ).agg(
+            (
+                round(
+                    col("total_matches") / df.select("match_id").count(),
+                    4,
+                )
+                * 100
+            ).alias("pick_rate"),
+            (col("top_4_matches") / col("total_matches") * 100).alias("top_4_rate"),
+            (col("top_1_matches") / col("total_matches") * 100).alias("top_1_rate"),
+        )
+        metrics_df = (
+            metrics_df.filter(~col("item").like("%Emblem%"))
+            .filter(~col("item").like("%Ornn%"))
+            .filter(~col("item").like("%Radiant%"))
+        )
+        windowSpec = Window.partitionBy("unit_id").orderBy(
+            desc("pick_rate"), desc("top_4_rate")
+        )
+        ranked_metrics_df = metrics_df.withColumn("rank", row_number().over(windowSpec))
+        final_df = ranked_metrics_df.filter(col("rank") <= 5).drop("rank")
+        final_df.show(truncate=False, vertical=True)
+        return final_df
+
+    def calculate_player_metrics(self, df):
+        return df.groupBy("tier").agg(
+            avg("wins").alias("average_times_won"),
+            avg("losses").alias("average_times_lost"),
+        )
+
+    def calculate_placement_metrics(self, df):
+        metrics_df = df.groupBy("placement").agg(
+            avg("gold_left").alias("average_gold_left"),
+            avg("time_eliminated").alias("average_time_eliminated"),
+            avg("total_damage_to_players").alias("average_damage_to_players"),
+            avg("level").alias("average_level"),
+            (count(when(col("level") <= 6, True)) / count("*") * 100).alias(
+                "percentage_level_6_or_less"
+            ),
+            (count(when(col("level") == 7, True)) / count("*") * 100).alias(
+                "percentage_level_7"
+            ),
+            (count(when(col("level") == 8, True)) / count("*") * 100).alias(
+                "percentage_level_8"
+            ),
+            (count(when(col("level") == 10, True)) / count("*") * 100).alias(
+                "percentage_level_9"
+            ),
+            (count(when(col("level") == 10, True)) / count("*") * 100).alias(
+                "percentage_level_10"
+            ),
+        )
+
+        return metrics_df
+
+    def calculate_composition_metrics(self, df):
+        pass

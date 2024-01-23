@@ -69,6 +69,8 @@ class MatchIngestion(ApiIngestion):
                 match = self.api_handler.request_match(match_id)
             rdd = self.spark_manager.spark.sparkContext.parallelize([match])
             df = self.spark_manager.spark.read.json(rdd, multiLine=True)
+            if "partner_group_id" in df.columns:
+                continue
             df_result = (
                 df.select(
                     "metadata.match_id",
@@ -93,8 +95,11 @@ class MatchIngestion(ApiIngestion):
                     "outcome", when(col("placement") < 5, "win").otherwise("loss")
                 )
             )
-            self.writer.write(
-                df_result,
-                "bronze.matches",
-                partition_by="outcome",
-            )
+            try:
+                self.writer.write(
+                    df_result,
+                    "bronze.matches",
+                    partition_by="outcome",
+                )
+            except Exception:
+                continue
