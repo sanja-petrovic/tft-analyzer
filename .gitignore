@@ -8,3 +8,6 @@ build/
 /spark-warehouse
 metastore_db
 tft.env
+*/logs
+*.tgz
+*.jar
