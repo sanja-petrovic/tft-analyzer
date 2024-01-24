@@ -55,7 +55,9 @@ class MatchIngestion(ApiIngestion):
             )
 
         self.writer.write_or_upsert(
-            players_df, "bronze.players", "new_table.idx == `bronze.players`.idx"
+            players_df,
+            "bronze.players",
+            "new_table.idx == `bronze.players`.idx AND new_table.puuid == `bronze.players`.puuid",
         )
         match_ids = list(set(match_ids))
         with open("./match_ids.txt", "w") as f:
