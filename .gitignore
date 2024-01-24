@@ -8,8 +8,6 @@ build/
 /spark-warehouse
 metastore_db
 tft.env
-*.log
-*.jar
+*/logs
 *.tgz
-*.ipynb
-airflow/logs/scheduler/latest
+*.jar

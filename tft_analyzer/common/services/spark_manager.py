@@ -17,11 +17,27 @@ class SparkManager:
             )
             .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
             .config(
+                "spark.delta.logStore.class",
+                "org.apache.spark.sql.delta.storage.HDFSLogStore",
+            )
+            .config(
                 "spark.sql.catalog.spark_catalog",
                 "org.apache.spark.sql.delta.catalog.DeltaCatalog",
             )
-            .config("spark.sql.warehouse.dir", "./spark-warehouse")
-            .config("hive.metastore.uris", "thrift://hive-metastore:9083")
+            .config(
+                "spark.sql.warehouse.dir", "hdfs://namenode:9000/user/hive/warehouse"
+            )
+            .config(
+                "spark.hadoop.javax.jdo.option.ConnectionURL",
+                "jdbc:postgresql://hive-metastore-postgresql/metastore",
+            )
+            .config(
+                "spark.hadoop.javax.jdo.option.ConnectionDriverName",
+                "org.postgresql.Driver",
+            )
+            .config("spark.hadoop.javax.jdo.option.ConnectionUserName", "hive")
+            .config("spark.hadoop.javax.jdo.option.ConnectionPassword", "hive")
+            .config("spark.hadoop.hive.metastore.uris", "thrift://hive-metastore:9083")
             .config("spark.pyspark.python", "python3")
             .enableHiveSupport()
             .getOrCreate()

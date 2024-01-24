@@ -20,7 +20,7 @@ class Writer:
         partition_by: Union[str, None] = None,
     ) -> None:
         logger.info(f'Started writing to Delta table "{table}"...')
-        df.write.format("delta").option("overwriteSchema", "true").saveAsTable(
+        df.write.format("delta").option("mergeSchema", "true").saveAsTable(
             table, partitionBy=partition_by, mode=mode
         )
         logger.info(f'Finished writing to Delta table "{table}".')

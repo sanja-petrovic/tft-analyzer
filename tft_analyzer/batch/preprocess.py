@@ -1,7 +1,16 @@
 from typing import Union
 from common.services.job import Job
 
-from pyspark.sql.functions import explode_outer, col, when, lit, count, explode
+from pyspark.sql.functions import (
+    explode_outer,
+    col,
+    when,
+    lit,
+    count,
+    explode,
+    monotonically_increasing_id,
+    posexplode,
+)
 
 from delta.tables import DeltaTable
 
@@ -60,10 +69,17 @@ class Preprocessing(Job):
                     "placement",
                     "puuid",
                     "unit_id",
-                    col("unit_items").getItem(0).alias("unit_item_1"),
-                    col("unit_items").getItem(1).alias("unit_item_2"),
-                    col("unit_items").getItem(2).alias("unit_item_3"),
+                    posexplode("unit_items"),
                     "unit_tier",
+                )
+                .select(
+                    "match_id",
+                    "placement",
+                    "puuid",
+                    "unit_id",
+                    col("col").alias("item"),
+                    "unit_tier",
+                    "pos",
                 )
             )
             df = df.drop("units")
@@ -100,9 +116,8 @@ class Preprocessing(Job):
                 "new_table.puuid = `silver.match_units`.puuid AND "
                 "new_table.unit_id = `silver.match_units`.unit_id AND "
                 "new_table.unit_tier = `silver.match_units`.unit_tier AND "
-                "new_table.unit_item_1 = `silver.match_units`.unit_item_1 AND "
-                "new_table.unit_item_2 = `silver.match_units`.unit_item_2 AND "
-                "new_table.unit_item_3 = `silver.match_units`.unit_item_3 AND ",
+                "new_table.item = `silver.match_units`.item AND ",
+                "new_table.pos = `silver.match_units`.pos",
             )
             self.writer.write_or_upsert(
                 df,
