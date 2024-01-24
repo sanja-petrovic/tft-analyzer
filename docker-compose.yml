@@ -149,9 +149,9 @@ services:
       - ./hadoop.env
 
   jupyter:
-    build: ./jupyter-docker-compose
+    build: ./jupyter
     volumes:
-      - ./jupyter-docker-compose/work:/home/jovyan/work
+      - ./jupyter/work:/home/jovyan/work
     ports:
       - 8888:8888
     container_name: jupyter

@@ -144,6 +144,7 @@ class Transformer:
         return df.groupBy("tier").agg(
             avg("wins").alias("average_times_won"),
             avg("losses").alias("average_times_lost"),
+            count("*").alias("count"),
         )
 
     def calculate_placement_metrics(self, df):

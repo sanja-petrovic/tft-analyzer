@@ -52,4 +52,8 @@ class PlayerIngestion(ApiIngestion):
         df = df.filter(col("queueType") == "RANKED_TFT")
         df = df.withColumn("idx", monotonically_increasing_id())
         df = df.withColumn("processedTime", lit(None).cast(StringType()))
-        self.writer.write(df, "bronze.players", mode="overwrite", partition_by="tier")
+        self.writer.write(
+            df,
+            "bronze.players",
+            mode="append",
+        )
