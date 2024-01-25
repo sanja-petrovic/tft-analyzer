@@ -25,7 +25,7 @@ with DAG(
     champion_metrics = SparkSubmitOperator(
         task_id="champion_metrics",
         conn_id="tft_spark",
-        application="/tft_analyzer/app/batch/aggregate/aggregate/champion_metrics.py",
+        application="/tft_analyzer/app/batch/aggregate/champion_metrics.py",
         conf={"spark.master": "spark://spark-master:7077"},
         packages="io.delta:delta-core_2.12:2.2.0",
     )
@@ -36,6 +36,41 @@ with DAG(
         conf={"spark.master": "spark://spark-master:7077"},
         packages="io.delta:delta-core_2.12:2.2.0",
     )
+    player_metrics = SparkSubmitOperator(
+        task_id="player_metrics",
+        conn_id="tft_spark",
+        application="/tft_analyzer/app/batch/aggregate/player_metrics.py",
+        conf={"spark.master": "spark://spark-master:7077"},
+        packages="io.delta:delta-core_2.12:2.2.0",
+    )
+    champion_item_metrics = SparkSubmitOperator(
+        task_id="champion_item_metrics",
+        conn_id="tft_spark",
+        application="/tft_analyzer/app/batch/aggregate/champion_item_metrics.py",
+        conf={"spark.master": "spark://spark-master:7077"},
+        packages="io.delta:delta-core_2.12:2.2.0",
+    )
+    placement_metrics = SparkSubmitOperator(
+        task_id="placement_metrics",
+        conn_id="tft_spark",
+        application="/tft_analyzer/app/batch/aggregate/placement_metrics.py",
+        conf={"spark.master": "spark://spark-master:7077"},
+        packages="io.delta:delta-core_2.12:2.2.0",
+    )
+    composition_metrics = SparkSubmitOperator(
+        task_id="composition_metrics",
+        conn_id="tft_spark",
+        application="/tft_analyzer/app/batch/aggregate/composition_metrics.py",
+        conf={"spark.master": "spark://spark-master:7077"},
+        packages="io.delta:delta-core_2.12:2.2.0",
+    )
 
-
-augment_metrics >> item_metrics >> champion_metrics >> trait_metrics
+(
+    augment_metrics
+    >> item_metrics
+    >> trait_metrics
+    >> champion_item_metrics
+    >> player_metrics
+    >> placement_metrics
+    >> composition_metrics
+)

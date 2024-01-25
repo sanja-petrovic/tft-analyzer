@@ -125,9 +125,11 @@ def calculate_player_metrics(df):
 
 if __name__ == "__main__":
     spark = create_spark()
-    player_df = calculate_player_metrics(read_delta("silver.players"))
+    player_df = read_delta("silver.players", spark)
+    player_metrics_df = calculate_player_metrics(player_df)
     write_or_upsert(
-        player_df,
+        spark,
+        player_metrics_df,
         "gold.player_metrics",
         "new_table.tier == `gold.player_metrics`.tier",
     )

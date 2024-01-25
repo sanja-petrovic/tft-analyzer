@@ -146,9 +146,11 @@ def calculate_placement_metrics(df):
 
 if __name__ == "__main__":
     spark = create_spark()
-    match_df = calculate_placement_metrics(read_delta("silver.matches"))
+    match_df = read_delta("silver.matches", spark)
+    placement_metrics_df = calculate_placement_metrics(match_df)
     write_or_upsert(
-        match_df,
+        spark,
+        placement_metrics_df,
         "gold.placement_metrics",
         "new_table.placement == `gold.placement_metrics`.placement",
     )

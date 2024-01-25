@@ -6,7 +6,7 @@ with DAG(
     dag_id="ingest_matches",
     tags=["tft", "batch", "ingest", "match"],
     start_date=datetime(2024, 1, 24, 22, 0, 0),
-    schedule_interval="*/30 * * * *",
+    schedule_interval=None,
 ) as dag:
     ingest_matches = SparkSubmitOperator(
         task_id="ingest_matches",

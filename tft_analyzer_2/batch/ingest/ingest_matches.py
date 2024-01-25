@@ -12,7 +12,7 @@ import requests
 
 from delta import DeltaTable
 
-RIOT_API = "RGAPI-546d27a6-f1f9-495d-be79-d0f58206d9a9"
+RIOT_API = "SECRET"
 
 
 class NotFoundError(Exception):

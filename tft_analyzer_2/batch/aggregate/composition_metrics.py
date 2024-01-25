@@ -208,9 +208,10 @@ def calculate_compositions(df):
 
 if __name__ == "__main__":
     spark = create_spark()
-    match_traits_df = read_delta("silver.match_traits")
+    match_traits_df = read_delta("silver.match_traits", spark)
     composition_df = calculate_compositions(match_traits_df)
     write_or_upsert(
+        spark,
         composition_df,
         "gold.composition_metrics",
         "new_table.rank == `gold.composition_metrics`.rank",

@@ -7,11 +7,8 @@ from pyspark.sql.functions import (
     count,
     when,
     round,
-    lit,
-    avg,
     desc,
     row_number,
-    rank,
 )
 
 from loguru import logger
