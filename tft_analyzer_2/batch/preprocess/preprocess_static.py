@@ -3,7 +3,7 @@ from loguru import logger
 from typing import Union
 
 
-from pyspark.sql.functions import col, explode_outer, posexplode
+from pyspark.sql.functions import col
 from loguru import logger
 from typing import Union
 from delta import DeltaTable
@@ -96,119 +96,39 @@ def write_or_upsert(
 ):
     splitted = table_name.split(".")
     if table_exists(spark, splitted[1], splitted[0]):
-        existing_silver = DeltaTable.convertToDelta(spark, table_name)
-        upsert(
-            "new_table",
-            table_name,
-            df,
-            existing_silver,
-            condition,
-        )
+        try:
+            existing_silver = DeltaTable.convertToDelta(spark, table_name)
+            upsert(
+                "new_table",
+                table_name,
+                df,
+                existing_silver,
+                condition,
+            )
+        except Exception:
+            write_delta(df, table_name, partition_by=partition_by)
     else:
         write_delta(df, table_name, partition_by=partition_by)
 
 
-def preprocess(spark, df: DataFrame):
-    df = df.dropDuplicates(["match_id", "puuid"])
-
-    augments_df = df.select(
-        "match_id",
-        "placement",
-        "puuid",
-        col("augments")[0].alias("augment1"),
-        col("augments")[1].alias("augment2"),
-        col("augments")[2].alias("augment3"),
-    )
-    df = df.drop("augments")
-
-    units_df = (
-        df.select(
-            "match_id",
-            "placement",
-            "puuid",
-            explode_outer("units").alias("unit"),
-        )
-        .select(
-            "match_id",
-            "placement",
-            "puuid",
-            col("unit").getField("character_id").alias("unit_id"),
-            col("unit").getField("itemNames").alias("unit_items"),
-            col("unit").getField("tier").alias("unit_tier"),
-        )
-        .select(
-            "match_id",
-            "placement",
-            "puuid",
-            "unit_id",
-            posexplode("unit_items"),
-            "unit_tier",
-        )
-        .select(
-            "match_id",
-            "placement",
-            "puuid",
-            "unit_id",
-            col("col").alias("item"),
-            "unit_tier",
-            "pos",
-        )
-    )
-    df = df.drop("units")
-
-    traits_df = df.select(
-        "match_id", "placement", "puuid", explode_outer("traits").alias("trait")
-    ).select(
-        "match_id",
-        "placement",
-        "puuid",
-        col("trait").getField("name").alias("trait_id"),
-        col("trait").getField("num_units").alias("trait_unit_count"),
-        col("trait").getField("tier_current").alias("trait_tier"),
-        col("trait").getField("tier_total").alias("trait_tier_max"),
-    )
-    df = df.drop("traits")
-
-    df = df.drop("companion")
-
-    write_or_upsert(
-        spark,
-        augments_df,
-        "silver.match_augments",
-        "new_table.match_id = `silver.match_augments`.match_id AND "
-        "new_table.puuid = `silver.match_augments`.puuid",
-    )
-    write_or_upsert(
-        spark,
-        traits_df,
-        "silver.match_traits",
-        "new_table.match_id = `silver.match_traits`.match_id AND "
-        "new_table.puuid = `silver.match_traits`.puuid AND "
-        "new_table.trait_id = `silver.match_traits`.trait_id",
-    )
-    write_or_upsert(
-        spark,
-        units_df,
-        "silver.match_units",
-        "new_table.match_id = `silver.match_units`.match_id AND "
-        "new_table.puuid = `silver.match_units`.puuid AND "
-        "new_table.unit_id = `silver.match_units`.unit_id AND "
-        "new_table.unit_tier = `silver.match_units`.unit_tier AND "
-        "new_table.item = `silver.match_units`.item AND ",
-        "new_table.pos = `silver.match_units`.pos",
-    )
+def preprocess(spark, df: DataFrame, id_column: str, table: str):
+    df = df.dropDuplicates([id_column])
     write_or_upsert(
         spark,
         df,
-        "silver.matches",
-        "new_table.match_id = `silver.matches`.match_id AND "
-        "new_table.puuid = `silver.matches`.puuid",
-        partition_by="outcome",
+        f"silver.{table}",
+        f"new_table.{id_column} = `silver.{table}`.{id_column}",
     )
 
 
 if __name__ == "__main__":
     spark = create_spark()
-    matches_df = read_delta("bronze.matches", spark)
+    traits_df = read_delta("bronze.traits", spark)
+    champions_df = read_delta("bronze.champions", spark)
+    items_df = read_delta("bronze.items", spark)
+    augments_df = read_delta("bronze.augments", spark)
 
-    preprocess(spark, matches_df)
+    preprocess(spark, traits_df, "id", "traits")
+    preprocess(spark, champions_df, "id", "champions")
+    preprocess(spark, items_df, "id", "items")
+    preprocess(spark, augments_df, "name", "augments")

@@ -26,7 +26,6 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
     - ../tft_analyzer_2:/tft_analyzer/app
-    - ../resources:/tft_analyzer/resources
   user: "${AIRFLOW_UID:-50000}:0"
   networks:
     - tft_network

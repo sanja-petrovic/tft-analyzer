@@ -6,23 +6,6 @@ networks:
     external: true
     
 services:
-
-  # analyzer:
-  #   build: .
-  #   container_name: tft-analyzer
-  #   ports:
-  #     - "8000:8000"
-  #   volumes:
-  #     - ./data:/app/data
-  #     - ./spark-warehouse:/app/spark-warehouse
-  #   depends_on:
-  #     - spark-master
-  #   env_file:
-  #     - ./tft.env
-  #   networks:
-  #     - tft_network
-
-
   server:
     build: ./tft-server
     container_name: tft-server
@@ -30,6 +13,8 @@ services:
       - "8009:8009"
     depends_on:
       - kafka
+    networks:
+      - tft_network
 
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
@@ -184,6 +169,8 @@ services:
       - hadoop_historyserver:/hadoop/yarn/timeline
     env_file:
       - ./hadoop.env
+    networks:
+      - tft_network
 
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
@@ -192,8 +179,9 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     ports:
-    
       - "2181:2181"
+    networks:
+      - tft_network
 
   schema-registry:
     image: confluentinc/cp-schema-registry:latest
@@ -209,6 +197,8 @@ services:
       SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8086
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://localhost:19092
       SCHEMA_REGISTRY_DEBUG: 'true'
+    networks:
+      - tft_network
 
   kafka:
     image: confluentinc/cp-kafka:latest
@@ -224,6 +214,8 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://localhost:19092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - tft_network
   kafdrop:
     container_name: kafdrop
     image: obsidiandynamics/kafdrop
@@ -233,6 +225,8 @@ services:
       KAFKA_BROKERCONNECT: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://localhost:19092
     depends_on:
       - kafka
+    networks:
+      - tft_network
 volumes:
   hadoop_namenode:
   hadoop_datanode:
