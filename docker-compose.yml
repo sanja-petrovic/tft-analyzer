@@ -1,19 +1,35 @@
 version: '2' 
 
+networks:
+  tft_network:
+    name: tft_network
+    external: true
+    
 services:
-
-  analyzer:
-    build: .
-    container_name: tft-analyzer
+  server:
+    build: ./tft-server
+    container_name: tft-server
     ports:
-      - "8000:8000"
-    volumes:
-      - ./data:/app/data
-      - ./spark-warehouse:/app/spark-warehouse
+      - "8009:8009"
     depends_on:
-      - spark-master
-    env_file:
-      - ./tft.env
+      - kafka
+    networks:
+      - tft_network
+
+  warehouse:
+    image: postgres
+    container_name: warehouse
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_MULTIPLE_DATABASES=central_db,postgres:ns_db,postgres:bg_db,postgres:nis_db,postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - data:/var/lib/postgresql/data
+      - ./docker-postgresql-multiple-databases:/docker-entrypoint-initdb.d
 
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
@@ -23,10 +39,13 @@ services:
       - 9010:9000
     volumes:
       - hadoop_namenode:/hadoop/dfs/name
+      - ./data:/opt/data
     environment:
       - CLUSTER_NAME=test
     env_file:
       - ./hadoop.env
+    networks:
+      - tft_network
 
   datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
@@ -41,6 +60,8 @@ services:
       - "9864:9864"
     env_file:
       - ./hadoop.env
+    networks:
+      - tft_network
 
   spark-master:
     image: bde2020/spark-master:latest
@@ -49,7 +70,7 @@ services:
       - namenode
       - datanode
     ports:
-      - "8080:8080"
+      - "8070:8070"
       - "7077:7077"
     volumes:
       - ./data:/app/data
@@ -57,6 +78,8 @@ services:
       - INIT_DAEMON_STEP=setup_spark
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
       - PYSPARK_PYTHON=python3
+    networks:
+      - tft_network
 
   spark-worker-1:
     image: bde2020/spark-worker:latest
@@ -73,6 +96,8 @@ services:
       - SPARK_WORKER_MEMORY = 8g
       - SPARK_WORKER_CORES = 4
       - PYSPARK_PYTHON=python3
+    networks:
+      - tft_network
 
   spark-worker-2:
     image: bde2020/spark-worker:latest
@@ -89,10 +114,14 @@ services:
       - SPARK_WORKER_MEMORY = 8g
       - SPARK_WORKER_CORES = 4
       - PYSPARK_PYTHON=python3
+    networks:
+      - tft_network
 
   hive-metastore-postgresql:
     image: bde2020/hive-metastore-postgresql:2.3.0
     container_name: hive-metastore-postgresql
+    networks:
+      - tft_network
 
   hive-server:
     image: bde2020/hive:2.3.2-postgresql-metastore
@@ -107,6 +136,8 @@ services:
       SERVICE_PRECONDITION: "hive-metastore:9083"
     ports:
       - "10000:10000"
+    networks:
+      - tft_network
 
   hive-metastore:
     image: bde2020/hive:2.3.2-postgresql-metastore
@@ -118,6 +149,8 @@ services:
       SERVICE_PRECONDITION: "namenode:9000 datanode:9864 hive-metastore-postgresql:5432"
     ports:
       - "9083:9083"
+    networks:
+      - tft_network
 
   resourcemanager:
     image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
@@ -127,6 +160,8 @@ services:
       SERVICE_PRECONDITION: "namenode:9000 datanode:9864"
     env_file:
       - ./hadoop.env
+    networks:
+      - tft_network
 
   nodemanager1:
     image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
@@ -136,6 +171,8 @@ services:
       SERVICE_PRECONDITION: "namenode:9000 datanode:9864 resourcemanager:8088"
     env_file:
       - ./hadoop.env
+    networks:
+      - tft_network
 
   historyserver:
     image: bde2020/hadoop-historyserver:2.0.0-hadoop3.2.1-java8
@@ -147,17 +184,64 @@ services:
       - hadoop_historyserver:/hadoop/yarn/timeline
     env_file:
       - ./hadoop.env
+    networks:
+      - tft_network
 
-  jupyter:
-    build: ./jupyter
-    volumes:
-      - ./jupyter/work:/home/jovyan/work
-    ports:
-      - 8888:8888
-    container_name: jupyter
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
     environment:
-      JUPYTER_ENABLE_LAB: "yes"
-    command: "start-notebook.sh --NotebookApp.token="
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - tft_network
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:latest
+    hostname: schema-registry
+    container_name: schema-registry
+    depends_on:
+      - kafka
+    ports:
+      - "8086:8086"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
+      SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8086
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://localhost:19092
+      SCHEMA_REGISTRY_DEBUG: 'true'
+    networks:
+      - tft_network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    hostname: kafka
+    container_name: kafka
+    ports:
+      - "19092:19092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://localhost:19092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - tft_network
+  kafdrop:
+    container_name: kafdrop
+    image: obsidiandynamics/kafdrop
+    ports:
+      - "9000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://localhost:19092
+    depends_on:
+      - kafka
+    networks:
+      - tft_network
 volumes:
   hadoop_namenode:
   hadoop_datanode:

@@ -1,0 +1,14 @@
+
+Faker
+tqdm
+pytz
+types-pytz
+pandas
+ua-parser
+pandarallel
+pyarrow
+loguru
+confluent-kafka
+requests
+fastavro
+click
