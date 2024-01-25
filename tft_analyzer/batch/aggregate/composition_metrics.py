@@ -187,7 +187,9 @@ def calculate_compositions(df):
             "strength",
             (8 / col("avg_placement"))
             * (col("trait1_strength") * col("trait2_strength"))
-            * col("pick_rate"),
+            * col("pick_rate")
+            * col("top_4_rate")
+            * col("top_1_rate"),
         )
     )
     average_strength = strength_combinations.groupBy(
