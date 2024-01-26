@@ -86,11 +86,9 @@ def write_stream(
     df: DataFrame, table: str, partition_by: Union[str, None] = None
 ) -> None:
     logger.info("Writing to Delta stream...")
-    df.writeStream.format("delta").outputMode("append").trigger(
+    df.writeStream.format("delta").outputMode("complete").trigger(
         availableNow=True
-    ).option("checkpointLocation", f"{CHECKPOINT}/gold-server").partitionBy(
-        partition_by
-    ).toTable(
+    ).option("checkpointLocation", f"{CHECKPOINT}/gold-server").toTable(
         table
     ).awaitTermination()
     logger.info("Finished writing to Delta stream.")

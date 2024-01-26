@@ -73,6 +73,16 @@ def read_stream(table: str, spark: SparkSession) -> DataFrame:
     return df
 
 
+def show(df):
+    query = (
+        df.writeStream.format("console")
+        .outputMode("complete")
+        .option("truncate", False)
+        .start()
+    )
+    query.awaitTermination()
+
+
 def write_stream(
     df: DataFrame, table: str, partition_by: Union[str, None] = None
 ) -> None:
@@ -84,6 +94,7 @@ def write_stream(
     ).toTable(
         table
     ).awaitTermination()
+
     logger.info("Finished writing to Delta stream.")
 
 

@@ -36,3 +36,5 @@ with DAG(
         conf={"spark.master": "spark://spark-master:7077"},
         packages="io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0",
     )
+
+server_metrics >> transaction_metrics >> engagement_metrics >> player_activity_metrics

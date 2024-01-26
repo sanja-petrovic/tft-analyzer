@@ -6,7 +6,7 @@ with DAG(
     dag_id="preprocess_matches",
     tags=["tft", "batch", "preprocess", "match"],
     start_date=datetime(2024, 1, 24, 22, 15, 0),
-    schedule_interval="@hourly",
+    schedule_interval=None,
 ) as dag:
     preprocess_matches = SparkSubmitOperator(
         task_id="preprocess_matches",

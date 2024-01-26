@@ -299,7 +299,7 @@ def generate_log_entry(
 
 
 if __name__ == "__main__":
-    num_entries = 100
+    num_entries = 10000
     start_datetime = datetime.datetime(2023, 10, 1, 0, 0, 0)
     end_datetime = datetime.datetime(2024, 2, 1, 0, 0, 0)
     topic = "tft.server.logs"
@@ -314,4 +314,3 @@ if __name__ == "__main__":
     broker = MessageBroker(schema_registry)
     for _ in range(num_entries):
         broker.produce(generate_log_entry(), topic)
-        # time.sleep(0.5)
