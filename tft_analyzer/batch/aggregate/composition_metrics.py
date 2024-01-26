@@ -1,20 +1,16 @@
 from pyspark.sql import SparkSession, DataFrame
 from loguru import logger
 from typing import Union
+from delta import DeltaTable
 from pyspark.sql.window import Window
 from pyspark.sql.functions import (
     col,
     count,
     when,
-    round,
-    lit,
+    avg,
     desc,
-    row_number,
+    rank,
 )
-
-from loguru import logger
-from typing import Union
-from delta import DeltaTable
 
 
 def create_spark() -> SparkSession:
@@ -26,7 +22,7 @@ def create_spark() -> SparkSession:
         .config("spark.sql.session.timeZone", "UTC")
         .config(
             "spark.jars.packages",
-            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0",
+            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
         )
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
@@ -75,6 +71,12 @@ def write_delta(
     logger.info(f'Finished writing to Delta table "{table}".')
 
 
+def write_warehouse(df, collection, mode):
+    df.write.format("mongodb").mode(mode).option(
+        "connection.uri", "mongodb://root:123456@warehouse:27017"
+    ).option("database", "gold").option("collection", collection).save()
+
+
 def upsert(
     new_alias: str,
     existing_alias: str,
@@ -119,111 +121,107 @@ def write_or_upsert(
         write_delta(df, table_name, partition_by=partition_by)
 
 
-def calculate_champion_item_metrics(df):
-    total_matches_per_champion_and_item = df.groupBy("unit_id", "item").agg(
-        count("match_id").alias("total_matches"),
-        count(when(col("placement") <= 4, True)).alias("top_4_matches"),
-        count(when(col("placement") == 1, True)).alias("top_1_matches"),
-    )
-    metrics_df = total_matches_per_champion_and_item.groupBy(
-        "unit_id", "item", "total_matches", "top_4_matches", "top_1_matches"
-    ).agg(
-        (
-            round(
-                col("total_matches") / df.select("match_id").count(),
-                4,
-            )
-            * 100
-        ).alias("pick_rate"),
-        (col("top_4_matches") / col("total_matches") * 100).alias("top_4_rate"),
-        (col("top_1_matches") / col("total_matches") * 100).alias("top_1_rate"),
-    )
-    metrics_df = (
-        metrics_df.filter(~col("item").like("%Emblem%"))
-        .filter(~col("item").like("%Ornn%"))
-        .filter(~col("item").like("%Radiant%"))
-    )
-    window_spec = Window.partitionBy("unit_id").orderBy(
-        desc("pick_rate"), desc("top_4_rate")
-    )
-    ranked_metrics_df = metrics_df.withColumn("rank", row_number().over(window_spec))
-    final_df = ranked_metrics_df.filter(col("rank") <= 5).drop("rank")
-    return final_df
-
-
-def calculate_augment_metrics_including_pick(df):
-    first_pick_df = df.select("match_id", "placement", "puuid", "augment1")
-    second_pick_df = df.select("match_id", "placement", "puuid", "augment2")
-    third_pick_df = df.select("match_id", "placement", "puuid", "augment3")
-
-    first_metrics = calculate_augment_metrics(first_pick_df, 1)
-    second_metrics = calculate_augment_metrics(second_pick_df, 2)
-    third_metrics = calculate_augment_metrics(third_pick_df, 3)
-
-    return (first_metrics, second_metrics, third_metrics)
-
-
-def calculate_augment_metrics(df, pick):
+def calculate_compositions(df):
     """
+    Compositions are an important concept in TFT.
+    They can be defined as a combination of two traits.
+    Usually, players are interested in knowing the best performing compositions that will help them climb ranks.
     Questions these metrics aim to answer:
-    1. How popular is each augment (pick rate)?
-    2. Are players gaining rank by playing this augment (top 4 rate)?
-    3. Are players winning by playing this augment (top 1 rate)?.
-    4. Does the performance of an augment depend on the time it's presented?
-       Are any of these augments more or less suited for early game, mid game or late game?
+    1. How strong is each composition?
+    2. How popular are these compositions? (pick rate)
+    3. Are players gaining rank by playing this composition (top 1 rate)?.
+    3. Are players winning by playing this composition (top 1 rate)?.
+    4. What is the average placement of these compositions?
+    5. What are the 25 best performing compositions?
     """
-    total_matches_per_augment = df.groupBy(f"augment{pick}").agg(
-        count("match_id").alias("total_matches"),
+    trait_combinations = (
+        df.alias("a")
+        .join(
+            df.alias("b"),
+            (col("a.match_id") == col("b.match_id"))
+            & (col("a.puuid") == col("b.puuid"))
+            & (col("a.placement") == col("b.placement"))
+            & (col("a.trait_id") != col("b.trait_id"))
+            & (col("a.trait_tier") < col("b.trait_tier")),
+            "inner",
+        )
+        .select(
+            col("a.trait_id").alias("trait1"),
+            col("b.trait_id").alias("trait2"),
+            col("a.trait_tier").alias("trait1_tier"),
+            col("b.trait_tier").alias("trait2_tier"),
+            col("a.trait_unit_count").alias("trait1_unit_count"),
+            col("b.trait_unit_count").alias("trait2_unit_count"),
+            col("a.trait_tier_max").alias("trait1_tier_max"),
+            col("b.trait_tier_max").alias("trait2_tier_max"),
+            "a.placement",
+        )
+        .filter(col("trait1_tier_max") > 1)
+        .filter(col("trait2_tier_max") > 1)
+    )
+
+    trait_combinations_metrics = trait_combinations.groupBy(
+        "trait1",
+        "trait2",
+        "trait1_tier",
+        "trait2_tier",
+        "trait1_tier_max",
+        "trait2_tier_max",
+    ).agg(
+        avg(col("placement")).alias("avg_placement"),
+        count("*").alias("total_matches"),
         count(when(col("placement") <= 4, True)).alias("top_4_matches"),
         count(when(col("placement") == 1, True)).alias("top_1_matches"),
+        (col("trait1_tier") / col("trait1_tier_max")).alias("trait1_strength"),
+        (col("trait2_tier") / col("trait2_tier_max")).alias("trait2_strength"),
     )
-    metrics_df = (
-        total_matches_per_augment.groupBy(
-            f"augment{pick}", "total_matches", "top_4_matches", "top_1_matches"
+
+    strength_combinations = (
+        trait_combinations_metrics.withColumn(
+            "pick_rate",
+            (col("total_matches") / df.select("match_id").distinct().count()),
         )
-        .agg(
-            (
-                round(
-                    col("total_matches") / df.select("match_id").count(),
-                    4,
-                )
-                * 100
-            ).alias("pick_rate"),
+        .withColumn(
+            "top_4_rate",
             (col("top_4_matches") / col("total_matches") * 100).alias("top_4_rate"),
+        )
+        .withColumn(
+            "top_1_rate",
             (col("top_1_matches") / col("total_matches") * 100).alias("top_1_rate"),
         )
-        .withColumnRenamed(f"augment{pick}", "augment_id")
-        .withColumn("pick_order", lit(pick))
+        .withColumn(
+            "strength",
+            (8 / col("avg_placement"))
+            * (col("trait1_strength") * col("trait2_strength"))
+            * col("pick_rate")
+            * col("top_4_rate")
+            * col("top_1_rate"),
+        )
     )
-    return metrics_df
+    average_strength = strength_combinations.groupBy(
+        "trait1",
+        "trait2",
+    ).agg(
+        avg(col("strength")).alias("strength"),
+        avg(col("avg_placement")).alias("avg_placement"),
+        avg(col("pick_rate")).alias("pick_rate"),
+        avg(col("top_4_rate")).alias("top_4_rate"),
+        avg(col("top_1_rate")).alias("top_1_rate"),
+    )
+    ranked_combinations = average_strength.withColumn(
+        "rank", rank().over(Window.orderBy(desc("strength")))
+    )
+    return ranked_combinations.filter("rank <= 25")
 
 
 if __name__ == "__main__":
     spark = create_spark()
-    augments_df = read_delta("silver.match_augments", spark)
-    (
-        augment1_metrics_df,
-        augment2_metrics_df,
-        augment3_metrics_df,
-    ) = calculate_augment_metrics_including_pick(augments_df)
+    match_traits_df = read_delta("silver.match_traits", spark)
+    composition_df = calculate_compositions(match_traits_df)
     write_or_upsert(
         spark,
-        augment1_metrics_df,
-        "gold.augment_metrics",
-        "new_table.augment_id == `gold.augment_metrics`.augment_id AND new_table.pick_order == `gold.augment_metrics`.pick_order",
-        partition_by="pick_order",
+        composition_df,
+        "gold.composition_metrics",
+        "new_table.rank == `gold.composition_metrics`.rank",
     )
-    write_or_upsert(
-        spark,
-        augment2_metrics_df,
-        "gold.augment_metrics",
-        "new_table.augment_id == `gold.augment_metrics`.augment_id AND new_table.pick_order == `gold.augment_metrics`.pick_order",
-        partition_by="pick_order",
-    )
-    write_or_upsert(
-        spark,
-        augment3_metrics_df,
-        "gold.augment_metrics",
-        "new_table.augment_id == `gold.augment_metrics`.augment_id AND new_table.pick_order == `gold.augment_metrics`.pick_order",
-        partition_by="pick_order",
-    )
+    write_warehouse(composition_df, "composition_metrics", "append")

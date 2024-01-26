@@ -1,16 +1,16 @@
 from pyspark.sql import SparkSession, DataFrame
 from loguru import logger
 from typing import Union
-from delta import DeltaTable
-from pyspark.sql.window import Window
+
 from pyspark.sql.functions import (
     col,
     count,
     when,
-    avg,
-    desc,
-    rank,
+    round,
 )
+from loguru import logger
+from typing import Union
+from delta import DeltaTable
 
 
 def create_spark() -> SparkSession:
@@ -22,7 +22,7 @@ def create_spark() -> SparkSession:
         .config("spark.sql.session.timeZone", "UTC")
         .config(
             "spark.jars.packages",
-            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0",
+            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
         )
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
@@ -115,104 +115,42 @@ def write_or_upsert(
         write_delta(df, table_name, partition_by=partition_by)
 
 
-def calculate_compositions(df):
+def calculate_trait_metrics(df):
     """
-    Compositions are an important concept in TFT.
-    They can be defined as a combination of two traits.
-    Usually, players are interested in knowing the best performing compositions that will help them climb ranks.
     Questions these metrics aim to answer:
-    1. How strong is each composition?
-    2. How popular are these compositions? (pick rate)
-    3. Are players gaining rank by playing this composition (top 1 rate)?.
-    3. Are players winning by playing this composition (top 1 rate)?.
-    4. What is the average placement of these compositions?
-    5. What are the 25 best performing compositions?
+    1. How popular is each trait (pick rate)?
+    2. Are players gaining rank by playing this trait (top 4 rate)?
+    3. Are players winning by playing this trait (top 1 rate)?.
     """
-    trait_combinations = (
-        df.alias("a")
-        .join(
-            df.alias("b"),
-            (col("a.match_id") == col("b.match_id"))
-            & (col("a.puuid") == col("b.puuid"))
-            & (col("a.placement") == col("b.placement"))
-            & (col("a.trait_id") != col("b.trait_id"))
-            & (col("a.trait_tier") < col("b.trait_tier")),
-            "inner",
-        )
-        .select(
-            col("a.trait_id").alias("trait1"),
-            col("b.trait_id").alias("trait2"),
-            col("a.trait_tier").alias("trait1_tier"),
-            col("b.trait_tier").alias("trait2_tier"),
-            col("a.trait_unit_count").alias("trait1_unit_count"),
-            col("b.trait_unit_count").alias("trait2_unit_count"),
-            col("a.trait_tier_max").alias("trait1_tier_max"),
-            col("b.trait_tier_max").alias("trait2_tier_max"),
-            "a.placement",
-        )
-        .filter(col("trait1_tier_max") > 1)
-        .filter(col("trait2_tier_max") > 1)
-    )
-
-    trait_combinations_metrics = trait_combinations.groupBy(
-        "trait1",
-        "trait2",
-        "trait1_tier",
-        "trait2_tier",
-        "trait1_tier_max",
-        "trait2_tier_max",
-    ).agg(
-        avg(col("placement")).alias("avg_placement"),
-        count("*").alias("total_matches"),
+    filtered_df = df.filter(col("trait_tier") > 0)
+    total_matches_per_trait = filtered_df.groupBy("trait_id", "trait_tier").agg(
+        count("match_id").alias("total_matches"),
         count(when(col("placement") <= 4, True)).alias("top_4_matches"),
         count(when(col("placement") == 1, True)).alias("top_1_matches"),
-        (col("trait1_tier") / col("trait1_tier_max")).alias("trait1_strength"),
-        (col("trait2_tier") / col("trait2_tier_max")).alias("trait2_strength"),
     )
-
-    strength_combinations = (
-        trait_combinations_metrics.withColumn(
-            "pick_rate",
-            (col("total_matches") / df.select("match_id").distinct().count()),
-        )
-        .withColumn(
-            "top_4_rate",
-            (col("top_4_matches") / col("total_matches") * 100).alias("top_4_rate"),
-        )
-        .withColumn(
-            "top_1_rate",
-            (col("top_1_matches") / col("total_matches") * 100).alias("top_1_rate"),
-        )
-        .withColumn(
-            "strength",
-            (8 / col("avg_placement"))
-            * (col("trait1_strength") * col("trait2_strength"))
-            * col("pick_rate"),
-        )
-    )
-    average_strength = strength_combinations.groupBy(
-        "trait1",
-        "trait2",
+    metrics_df = total_matches_per_trait.groupBy(
+        "trait_id", "trait_tier", "total_matches", "top_4_matches", "top_1_matches"
     ).agg(
-        avg(col("strength")).alias("strength"),
-        avg(col("avg_placement")).alias("avg_placement"),
-        avg(col("pick_rate")).alias("pick_rate"),
-        avg(col("top_4_rate")).alias("top_4_rate"),
-        avg(col("top_1_rate")).alias("top_1_rate"),
+        (
+            round(
+                col("total_matches") / df.select("match_id").count(),
+                4,
+            )
+            * 100
+        ).alias("pick_rate"),
+        (col("top_4_matches") / col("total_matches") * 100).alias("top_4_rate"),
+        (col("top_1_matches") / col("total_matches") * 100).alias("top_1_rate"),
     )
-    ranked_combinations = average_strength.withColumn(
-        "rank", rank().over(Window.orderBy(desc("strength")))
-    )
-    return ranked_combinations.filter("rank <= 25")
+    return metrics_df
 
 
 if __name__ == "__main__":
     spark = create_spark()
     match_traits_df = read_delta("silver.match_traits", spark)
-    composition_df = calculate_compositions(match_traits_df)
+    trait_metrics_df = calculate_trait_metrics(match_traits_df)
     write_or_upsert(
         spark,
-        composition_df,
-        "gold.composition_metrics",
-        "new_table.rank == `gold.composition_metrics`.rank",
+        trait_metrics_df,
+        "gold.trait_metrics",
+        "new_table.trait_id == `gold.trait_metrics`.trait_id AND new_table.trait_tier == `gold.trait_metrics`.trait_tier",
     )

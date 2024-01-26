@@ -3,5 +3,3 @@ USER root
 
 COPY requirements.txt /home/jovyan/
 RUN pip install -r /home/jovyan/requirements.txt
-
-COPY jupyter_lab_config.json /home/jovyan/

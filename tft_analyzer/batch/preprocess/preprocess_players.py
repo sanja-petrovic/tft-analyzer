@@ -18,7 +18,7 @@ def create_spark() -> SparkSession:
         .config("spark.sql.session.timeZone", "UTC")
         .config(
             "spark.jars.packages",
-            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0",
+            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
         )
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
@@ -96,39 +96,40 @@ def write_or_upsert(
 ):
     splitted = table_name.split(".")
     if table_exists(spark, splitted[1], splitted[0]):
-        try:
-            existing_silver = DeltaTable.convertToDelta(spark, table_name)
-            upsert(
-                "new_table",
-                table_name,
-                df,
-                existing_silver,
-                condition,
-            )
-        except Exception:
-            write_delta(df, table_name, partition_by=partition_by)
+        existing_silver = DeltaTable.convertToDelta(spark, table_name)
+        upsert(
+            "new_table",
+            table_name,
+            df,
+            existing_silver,
+            condition,
+        )
     else:
         write_delta(df, table_name, partition_by=partition_by)
 
 
-def preprocess(spark, df: DataFrame, id_column: str, table: str):
-    df = df.dropDuplicates([id_column])
+def preprocess(spark, df: DataFrame):
+    df = df.select(
+        "puuid",
+        "summonerId",
+        "tier",
+        "rank",
+        "wins",
+        "losses",
+        "hotStreak",
+    )
+    df = df.dropDuplicates(["puuid"])
     write_or_upsert(
         spark,
         df,
-        f"silver.{table}",
-        f"new_table.{id_column} = `silver.{table}`.{id_column}",
+        "silver.players",
+        "new_table.puuid = `silver.players`.puuid",
+        "tier",
     )
 
 
 if __name__ == "__main__":
     spark = create_spark()
-    traits_df = read_delta("bronze.traits", spark)
-    champions_df = read_delta("bronze.champions", spark)
-    items_df = read_delta("bronze.items", spark)
-    augments_df = read_delta("bronze.augments", spark)
+    players_df = read_delta("bronze.players", spark)
 
-    preprocess(spark, traits_df, "id", "traits")
-    preprocess(spark, champions_df, "id", "champions")
-    preprocess(spark, items_df, "id", "items")
-    preprocess(spark, augments_df, "name", "augments")
+    preprocess(spark, players_df)

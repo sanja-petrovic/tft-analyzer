@@ -8,6 +8,7 @@ from schema_registry import SchemaRegistry
 from message_broker import MessageBroker
 
 fake = Faker()
+import time
 
 
 def get_puuid_list():
@@ -246,9 +247,9 @@ def generate_log_entry(
             elements=[
                 "register",
                 "game/start",
-                "buy?product=battle-pass&rp=1500"
-                "buy?product=chibi&rp=2000"
-                "buy?product=egg&rp=800"
+                "buy?product=battle-pass&rp=1500",
+                "buy?product=chibi&rp=2000",
+                "buy?product=egg&rp=800",
                 "buy?product=tactician&rp=1000",
             ]
         ),
@@ -313,3 +314,4 @@ if __name__ == "__main__":
     broker = MessageBroker(schema_registry)
     for _ in range(num_entries):
         broker.produce(generate_log_entry(), topic)
+        # time.sleep(0.5)

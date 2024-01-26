@@ -2,12 +2,8 @@ from pyspark.sql import SparkSession, DataFrame
 from loguru import logger
 from typing import Union
 
-from pyspark.sql.functions import (
-    col,
-    count,
-    when,
-    round,
-)
+
+from pyspark.sql.functions import col
 from loguru import logger
 from typing import Union
 from delta import DeltaTable
@@ -16,13 +12,13 @@ from delta import DeltaTable
 def create_spark() -> SparkSession:
     return (
         SparkSession.builder.master("spark://spark-master:7077")
-        .appName("tft-analyzer-batch-trait-metrics")
+        .appName("tft-analyzer-batch-static-preprocess")
         .config("spark.driver.extraJavaOptions", "-Duser.timezone=GMT")
         .config("spark.executor.extraJavaOptions", "-Duser.timezone=GMT")
         .config("spark.sql.session.timeZone", "UTC")
         .config(
             "spark.jars.packages",
-            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0",
+            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
         )
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
@@ -115,41 +111,24 @@ def write_or_upsert(
         write_delta(df, table_name, partition_by=partition_by)
 
 
-def calculate_item_metrics(df):
-    """
-    Questions these metrics aim to answer:
-    1. How popular is each item (pick rate)?
-    2. Are players gaining rank by making this item (top 4 rate)?
-    3. Are players winning by making this item (top 1 rate)?.
-    """
-    total_matches_per_item = df.groupBy("item").agg(
-        count("match_id").alias("total_matches"),
-        count(when(col("placement") <= 4, True)).alias("top_4_matches"),
-        count(when(col("placement") == 1, True)).alias("top_1_matches"),
+def preprocess(spark, df: DataFrame, id_column: str, table: str):
+    df = df.dropDuplicates([id_column])
+    write_or_upsert(
+        spark,
+        df,
+        f"silver.{table}",
+        f"new_table.{id_column} = `silver.{table}`.{id_column}",
     )
-    metrics_df = total_matches_per_item.groupBy(
-        "item", "total_matches", "top_4_matches", "top_1_matches"
-    ).agg(
-        (
-            round(
-                col("total_matches") / df.select("match_id").count(),
-                4,
-            )
-            * 100
-        ).alias("pick_rate"),
-        (col("top_4_matches") / col("total_matches") * 100).alias("top_4_rate"),
-        (col("top_1_matches") / col("total_matches") * 100).alias("top_1_rate"),
-    )
-    return metrics_df
 
 
 if __name__ == "__main__":
     spark = create_spark()
-    match_units_df = read_delta("silver.match_units", spark)
-    item_metrics_df = calculate_item_metrics(match_units_df)
-    write_or_upsert(
-        spark,
-        item_metrics_df,
-        "gold.item_metrics",
-        "new_table.item == `gold.item_metrics`.item",
-    )
+    traits_df = read_delta("bronze.traits", spark)
+    champions_df = read_delta("bronze.champions", spark)
+    items_df = read_delta("bronze.items", spark)
+    augments_df = read_delta("bronze.augments", spark)
+
+    preprocess(spark, traits_df, "id", "traits")
+    preprocess(spark, champions_df, "id", "champions")
+    preprocess(spark, items_df, "id", "items")
+    preprocess(spark, augments_df, "name", "augments")

@@ -2,8 +2,7 @@ from pyspark.sql import SparkSession, DataFrame
 from loguru import logger
 from typing import Union
 
-
-from pyspark.sql.functions import col, explode_outer, posexplode
+from pyspark.sql.functions import col, count, avg, when
 from loguru import logger
 from typing import Union
 from delta import DeltaTable
@@ -12,13 +11,13 @@ from delta import DeltaTable
 def create_spark() -> SparkSession:
     return (
         SparkSession.builder.master("spark://spark-master:7077")
-        .appName("tft-analyzer-batch-static-preprocess")
+        .appName("tft-analyzer-batch-trait-metrics")
         .config("spark.driver.extraJavaOptions", "-Duser.timezone=GMT")
         .config("spark.executor.extraJavaOptions", "-Duser.timezone=GMT")
         .config("spark.sql.session.timeZone", "UTC")
         .config(
             "spark.jars.packages",
-            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0",
+            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
         )
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
@@ -67,6 +66,12 @@ def write_delta(
     logger.info(f'Finished writing to Delta table "{table}".')
 
 
+def write_warehouse(df, collection, mode):
+    df.write.format("mongodb").mode(mode).option(
+        "connection.uri", "mongodb://root:123456@warehouse:27017"
+    ).option("database", "gold").option("collection", collection).save()
+
+
 def upsert(
     new_alias: str,
     existing_alias: str,
@@ -111,107 +116,48 @@ def write_or_upsert(
         write_delta(df, table_name, partition_by=partition_by)
 
 
-def preprocess(spark, df: DataFrame):
-    df = df.dropDuplicates(["match_id", "puuid"])
+def calculate_placement_metrics(df):
+    """
+    These metrics are supposed to gain insight into decisions players make during a match and how those affect their performance.
+    Questions these metrics aim to answer:
+    1. Within each placement, what is the average amount of gold left over (economy is a big part of the game)?
+    2. When is the average time players within this placement got eliminated?
+    3. Within this placement, what does the leveling distribution look like
+       (higher levels mean more power, but also require more economy and stability)?
+    """
+    metrics_df = df.groupBy("placement").agg(
+        avg("gold_left").alias("average_gold_left"),
+        avg("time_eliminated").alias("average_time_eliminated"),
+        avg("total_damage_to_players").alias("average_damage_to_players"),
+        avg("level").alias("average_level"),
+        (count(when(col("level") <= 6, True)) / count("*") * 100).alias(
+            "percentage_level_6_or_less"
+        ),
+        (count(when(col("level") == 7, True)) / count("*") * 100).alias(
+            "percentage_level_7"
+        ),
+        (count(when(col("level") == 8, True)) / count("*") * 100).alias(
+            "percentage_level_8"
+        ),
+        (count(when(col("level") == 10, True)) / count("*") * 100).alias(
+            "percentage_level_9"
+        ),
+        (count(when(col("level") == 10, True)) / count("*") * 100).alias(
+            "percentage_level_10"
+        ),
+    )
 
-    augments_df = df.select(
-        "match_id",
-        "placement",
-        "puuid",
-        col("augments")[0].alias("augment1"),
-        col("augments")[1].alias("augment2"),
-        col("augments")[2].alias("augment3"),
-    )
-    df = df.drop("augments")
-
-    units_df = (
-        df.select(
-            "match_id",
-            "placement",
-            "puuid",
-            explode_outer("units").alias("unit"),
-        )
-        .select(
-            "match_id",
-            "placement",
-            "puuid",
-            col("unit").getField("character_id").alias("unit_id"),
-            col("unit").getField("itemNames").alias("unit_items"),
-            col("unit").getField("tier").alias("unit_tier"),
-        )
-        .select(
-            "match_id",
-            "placement",
-            "puuid",
-            "unit_id",
-            posexplode("unit_items"),
-            "unit_tier",
-        )
-        .select(
-            "match_id",
-            "placement",
-            "puuid",
-            "unit_id",
-            col("col").alias("item"),
-            "unit_tier",
-            "pos",
-        )
-    )
-    df = df.drop("units")
-
-    traits_df = df.select(
-        "match_id", "placement", "puuid", explode_outer("traits").alias("trait")
-    ).select(
-        "match_id",
-        "placement",
-        "puuid",
-        col("trait").getField("name").alias("trait_id"),
-        col("trait").getField("num_units").alias("trait_unit_count"),
-        col("trait").getField("tier_current").alias("trait_tier"),
-        col("trait").getField("tier_total").alias("trait_tier_max"),
-    )
-    df = df.drop("traits")
-
-    df = df.drop("companion")
-
-    write_or_upsert(
-        spark,
-        augments_df,
-        "silver.match_augments",
-        "new_table.match_id = `silver.match_augments`.match_id AND "
-        "new_table.puuid = `silver.match_augments`.puuid",
-    )
-    write_or_upsert(
-        spark,
-        traits_df,
-        "silver.match_traits",
-        "new_table.match_id = `silver.match_traits`.match_id AND "
-        "new_table.puuid = `silver.match_traits`.puuid AND "
-        "new_table.trait_id = `silver.match_traits`.trait_id",
-    )
-    write_or_upsert(
-        spark,
-        units_df,
-        "silver.match_units",
-        "new_table.match_id = `silver.match_units`.match_id AND "
-        "new_table.puuid = `silver.match_units`.puuid AND "
-        "new_table.unit_id = `silver.match_units`.unit_id AND "
-        "new_table.unit_tier = `silver.match_units`.unit_tier AND "
-        "new_table.item = `silver.match_units`.item AND "
-        "new_table.pos = `silver.match_units`.pos",
-    )
-    write_or_upsert(
-        spark,
-        df,
-        "silver.matches",
-        "new_table.match_id = `silver.matches`.match_id AND "
-        "new_table.puuid = `silver.matches`.puuid",
-        partition_by="outcome",
-    )
+    return metrics_df
 
 
 if __name__ == "__main__":
     spark = create_spark()
-    matches_df = read_delta("bronze.matches", spark)
-
-    preprocess(spark, matches_df)
+    match_df = read_delta("silver.matches", spark)
+    placement_metrics_df = calculate_placement_metrics(match_df)
+    write_or_upsert(
+        spark,
+        placement_metrics_df,
+        "gold.placement_metrics",
+        "new_table.placement == `gold.placement_metrics`.placement",
+    )
+    write_warehouse(placement_metrics_df, "placement_metrics", "append")

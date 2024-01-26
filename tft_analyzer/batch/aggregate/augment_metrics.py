@@ -1,13 +1,17 @@
 from pyspark.sql import SparkSession, DataFrame
 from loguru import logger
 from typing import Union
-
+from pyspark.sql.window import Window
 from pyspark.sql.functions import (
     col,
     count,
     when,
     round,
+    lit,
+    desc,
+    row_number,
 )
+
 from loguru import logger
 from typing import Union
 from delta import DeltaTable
@@ -22,7 +26,7 @@ def create_spark() -> SparkSession:
         .config("spark.sql.session.timeZone", "UTC")
         .config(
             "spark.jars.packages",
-            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0",
+            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
         )
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
@@ -71,6 +75,12 @@ def write_delta(
     logger.info(f'Finished writing to Delta table "{table}".')
 
 
+def write_warehouse(df, collection, mode):
+    df.write.format("mongodb").mode(mode).option(
+        "connection.uri", "mongodb://root:123456@warehouse:27017"
+    ).option("database", "gold").option("collection", collection).save()
+
+
 def upsert(
     new_alias: str,
     existing_alias: str,
@@ -115,42 +125,82 @@ def write_or_upsert(
         write_delta(df, table_name, partition_by=partition_by)
 
 
-def calculate_trait_metrics(df):
+def calculate_augment_metrics_including_pick(df):
+    first_pick_df = df.select("match_id", "placement", "puuid", "augment1")
+    second_pick_df = df.select("match_id", "placement", "puuid", "augment2")
+    third_pick_df = df.select("match_id", "placement", "puuid", "augment3")
+
+    first_metrics = calculate_augment_metrics(first_pick_df, 1)
+    second_metrics = calculate_augment_metrics(second_pick_df, 2)
+    third_metrics = calculate_augment_metrics(third_pick_df, 3)
+
+    return (first_metrics, second_metrics, third_metrics)
+
+
+def calculate_augment_metrics(df, pick):
     """
     Questions these metrics aim to answer:
-    1. How popular is each trait (pick rate)?
-    2. Are players gaining rank by playing this trait (top 4 rate)?
-    3. Are players winning by playing this trait (top 1 rate)?.
+    1. How popular is each augment (pick rate)?
+    2. Are players gaining rank by playing this augment (top 4 rate)?
+    3. Are players winning by playing this augment (top 1 rate)?.
+    4. Does the performance of an augment depend on the time it's presented?
+       Are any of these augments more or less suited for early game, mid game or late game?
     """
-    filtered_df = df.filter(col("trait_tier") > 0)
-    total_matches_per_trait = filtered_df.groupBy("trait_id", "trait_tier").agg(
+    total_matches_per_augment = df.groupBy(f"augment{pick}").agg(
         count("match_id").alias("total_matches"),
         count(when(col("placement") <= 4, True)).alias("top_4_matches"),
         count(when(col("placement") == 1, True)).alias("top_1_matches"),
     )
-    metrics_df = total_matches_per_trait.groupBy(
-        "trait_id", "trait_tier", "total_matches", "top_4_matches", "top_1_matches"
-    ).agg(
-        (
-            round(
-                col("total_matches") / df.select("match_id").count(),
-                4,
-            )
-            * 100
-        ).alias("pick_rate"),
-        (col("top_4_matches") / col("total_matches") * 100).alias("top_4_rate"),
-        (col("top_1_matches") / col("total_matches") * 100).alias("top_1_rate"),
+    metrics_df = (
+        total_matches_per_augment.groupBy(
+            f"augment{pick}", "total_matches", "top_4_matches", "top_1_matches"
+        )
+        .agg(
+            (
+                round(
+                    col("total_matches") / df.select("match_id").count(),
+                    4,
+                )
+                * 100
+            ).alias("pick_rate"),
+            (col("top_4_matches") / col("total_matches") * 100).alias("top_4_rate"),
+            (col("top_1_matches") / col("total_matches") * 100).alias("top_1_rate"),
+        )
+        .withColumnRenamed(f"augment{pick}", "augment_id")
+        .withColumn("pick_order", lit(pick))
     )
     return metrics_df
 
 
 if __name__ == "__main__":
     spark = create_spark()
-    match_traits_df = read_delta("silver.match_traits", spark)
-    trait_metrics_df = calculate_trait_metrics(match_traits_df)
+    augments_df = read_delta("silver.match_augments", spark)
+    (
+        augment1_metrics_df,
+        augment2_metrics_df,
+        augment3_metrics_df,
+    ) = calculate_augment_metrics_including_pick(augments_df)
     write_or_upsert(
         spark,
-        trait_metrics_df,
-        "gold.trait_metrics",
-        "new_table.trait_id == `gold.trait_metrics`.trait_id AND new_table.trait_tier == `gold.trait_metrics`.trait_tier",
+        augment1_metrics_df,
+        "gold.augment_metrics",
+        "new_table.augment_id == `gold.augment_metrics`.augment_id AND new_table.pick_order == `gold.augment_metrics`.pick_order",
+        partition_by="pick_order",
     )
+    write_or_upsert(
+        spark,
+        augment2_metrics_df,
+        "gold.augment_metrics",
+        "new_table.augment_id == `gold.augment_metrics`.augment_id AND new_table.pick_order == `gold.augment_metrics`.pick_order",
+        partition_by="pick_order",
+    )
+    write_or_upsert(
+        spark,
+        augment3_metrics_df,
+        "gold.augment_metrics",
+        "new_table.augment_id == `gold.augment_metrics`.augment_id AND new_table.pick_order == `gold.augment_metrics`.pick_order",
+        partition_by="pick_order",
+    )
+    write_warehouse(augment1_metrics_df, "augment_metrics", "append")
+    write_warehouse(augment2_metrics_df, "augment_metrics", "append")
+    write_warehouse(augment3_metrics_df, "augment_metrics", "append")
