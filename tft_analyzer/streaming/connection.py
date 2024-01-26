@@ -1,4 +1,13 @@
-from pyspark.sql.functions import col, expr, approx_count_distinct, count
+from pyspark.sql.functions import (
+    col,
+    expr,
+    approx_count_distinct,
+    count,
+    window,
+    mean,
+    when,
+)
+from pyspark.sql.functions import sum as _sum
 from pyspark.sql.window import Window
 from pyspark.sql.types import DoubleType
 from pyspark.sql import DataFrame, SparkSession
@@ -47,17 +56,20 @@ def create_spark() -> SparkSession:
     )
 
 
-def calculate_user_engagement(spark, df):
-    user_engagement_df = df.groupBy(
-        col("action"), expr("window(timestamp, '1 day')").alias("time_window")
-    ).agg(
-        approx_count_distinct("puuid").alias("unique_users_count"),
-        count("*").alias("requests_count"),
-    )
+def calculate_placement_and_transaction_connection(spark, logs_df, matches_df):
+    joined_df = logs_df.join(matches_df, logs_df.puuid == matches_df.puuid, "inner")
+    windowed_df = (
+        joined_df.withWatermark("timestamp", "10 minutes")
+        .groupBy(window("timestamp", "1 day"), "puuid")
+        .agg(
+            mean("placement").alias("average_placement"),
+            sum(when(joined_df.action == "buy", 1).otherwise(0)).alias(
+                "transaction_count"
+            ),
+        )
+    ).withColumn("date", expr("date_trunc('day', window.start)"))
 
-    return user_engagement_df.withColumn(
-        "date", expr("date_trunc('day', time_window.start)")
-    )
+    return windowed_df
 
 
 def read_stream(table: str, spark: SparkSession) -> DataFrame:
@@ -81,8 +93,31 @@ def write_stream(
     logger.info("Finished writing to Delta stream.")
 
 
+def read_delta(table: str, spark) -> DataFrame:
+    logger.info(f'Started reading from "{table}"...')
+    df: DataFrame = spark.read.format("delta").table(table)
+    logger.info(f'Finished reading from "{table}".')
+    return df
+
+
+def write_delta(
+    df,
+    table: str,
+    mode: str = "append",
+    partition_by: Union[str, None] = None,
+) -> None:
+    logger.info(f'Started writing to Delta table "{table}"...')
+    df.write.format("delta").option("mergeSchema", "true").saveAsTable(
+        table, partitionBy=partition_by, mode=mode
+    )
+    logger.info(f'Finished writing to Delta table "{table}".')
+
+
 if __name__ == "__main__":
     spark = create_spark()
-    df = read_stream("silver.logs", spark)
-    metrics_df = calculate_user_engagement(spark, df)
-    write_stream(metrics_df, "gold.engagement_metrics", partition_by="date")
+    df_logs = read_stream("silver.logs", spark)
+    df_matches = read_delta("silver.matches", spark)
+    connection_df = calculate_placement_and_transaction_connection(
+        spark, df_logs, df_matches
+    )
+    write_stream(connection_df, "gold.player_placement_transaction_connection", "date")
