@@ -22,7 +22,7 @@ def create_spark() -> SparkSession:
         .config("spark.sql.session.timeZone", "UTC")
         .config(
             "spark.jars.packages",
-            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0",
+            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
         )
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
@@ -69,6 +69,12 @@ def write_delta(
         table, partitionBy=partition_by, mode=mode
     )
     logger.info(f'Finished writing to Delta table "{table}".')
+
+
+def write_warehouse(df, collection, mode):
+    df.write.format("mongodb").mode(mode).option(
+        "connection.uri", "mongodb://root:123456@warehouse:27017"
+    ).option("database", "gold").option("collection", collection).save()
 
 
 def upsert(
@@ -218,3 +224,4 @@ if __name__ == "__main__":
         "gold.composition_metrics",
         "new_table.rank == `gold.composition_metrics`.rank",
     )
+    write_warehouse(composition_df, "composition_metrics", "append")

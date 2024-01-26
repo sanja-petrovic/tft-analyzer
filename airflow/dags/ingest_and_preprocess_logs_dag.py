@@ -13,14 +13,14 @@ with DAG(
         conn_id="tft_spark",
         application="/tft_analyzer/app/streaming/ingest_logs.py",
         conf={"spark.master": "spark://spark-master:7077"},
-        packages="io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0",
+        packages="io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
     )
     preprocess_logs = SparkSubmitOperator(
         task_id="preprocess_logs",
         conn_id="tft_spark",
         application="/tft_analyzer/app/streaming/preprocess_logs.py",
         conf={"spark.master": "spark://spark-master:7077"},
-        packages="io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0",
+        packages="io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
     )
 
 ingest_logs >> preprocess_logs

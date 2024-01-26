@@ -26,7 +26,7 @@ def create_spark() -> SparkSession:
         .config("spark.sql.session.timeZone", "UTC")
         .config(
             "spark.jars.packages",
-            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0",
+            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
         )
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
@@ -75,6 +75,12 @@ def write_delta(
     logger.info(f'Finished writing to Delta table "{table}".')
 
 
+def write_warehouse(df, collection, mode):
+    df.write.format("mongodb").mode(mode).option(
+        "connection.uri", "mongodb://root:123456@warehouse:27017"
+    ).option("database", "gold").option("collection", collection).save()
+
+
 def upsert(
     new_alias: str,
     existing_alias: str,
@@ -117,38 +123,6 @@ def write_or_upsert(
             write_delta(df, table_name, partition_by=partition_by)
     else:
         write_delta(df, table_name, partition_by=partition_by)
-
-
-def calculate_champion_item_metrics(df):
-    total_matches_per_champion_and_item = df.groupBy("unit_id", "item").agg(
-        count("match_id").alias("total_matches"),
-        count(when(col("placement") <= 4, True)).alias("top_4_matches"),
-        count(when(col("placement") == 1, True)).alias("top_1_matches"),
-    )
-    metrics_df = total_matches_per_champion_and_item.groupBy(
-        "unit_id", "item", "total_matches", "top_4_matches", "top_1_matches"
-    ).agg(
-        (
-            round(
-                col("total_matches") / df.select("match_id").count(),
-                4,
-            )
-            * 100
-        ).alias("pick_rate"),
-        (col("top_4_matches") / col("total_matches") * 100).alias("top_4_rate"),
-        (col("top_1_matches") / col("total_matches") * 100).alias("top_1_rate"),
-    )
-    metrics_df = (
-        metrics_df.filter(~col("item").like("%Emblem%"))
-        .filter(~col("item").like("%Ornn%"))
-        .filter(~col("item").like("%Radiant%"))
-    )
-    window_spec = Window.partitionBy("unit_id").orderBy(
-        desc("pick_rate"), desc("top_4_rate")
-    )
-    ranked_metrics_df = metrics_df.withColumn("rank", row_number().over(window_spec))
-    final_df = ranked_metrics_df.filter(col("rank") <= 5).drop("rank")
-    return final_df
 
 
 def calculate_augment_metrics_including_pick(df):
@@ -227,3 +201,6 @@ if __name__ == "__main__":
         "new_table.augment_id == `gold.augment_metrics`.augment_id AND new_table.pick_order == `gold.augment_metrics`.pick_order",
         partition_by="pick_order",
     )
+    write_warehouse(augment1_metrics_df, "augment_metrics", "append")
+    write_warehouse(augment2_metrics_df, "augment_metrics", "append")
+    write_warehouse(augment3_metrics_df, "augment_metrics", "append")

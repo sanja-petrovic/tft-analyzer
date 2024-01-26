@@ -12,7 +12,7 @@ import requests
 
 from delta import DeltaTable
 
-RIOT_API = "SECRET"
+RIOT_API = "RGAPI-546d27a6-f1f9-495d-be79-d0f58206d9a9"
 
 
 class NotFoundError(Exception):
@@ -32,7 +32,7 @@ def create_spark() -> SparkSession:
         .config("spark.sql.session.timeZone", "UTC")
         .config(
             "spark.jars.packages",
-            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0",
+            "io.delta:delta-core_2.12:2.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,org.apache.spark:spark-avro_2.12:3.3.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
         )
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
@@ -168,10 +168,14 @@ if __name__ == "__main__":
 
     i = 0
     for puuid in puuids:
+        j = 0
         if i >= 5:
             break
         data = request_player_matches(puuid)
         while isinstance(data, dict) and "status" in data:
+            j += 1
+            if j == 3:
+                continue
             logger.info("Sleeping for 15 seconds...")
             time.sleep(15)
             data = request_player_matches(puuid)

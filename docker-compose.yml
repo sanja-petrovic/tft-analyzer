@@ -15,19 +15,20 @@ services:
       - kafka
     networks:
       - tft_network
-
+      
   warehouse:
-    image: postgres
+    image: mongo:5
     container_name: warehouse
     environment:
-      - POSTGRES_PASSWORD=postgres
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: 123456
+      MONGO_INITDB_DATABASE: gold
+    ports:
+      - 27017:27017
     volumes:
-      - warehouse_data:/var/lib/postgresql/data
+      - warehouse_data:/data/db
+    networks:
+      - tft_network
 
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
@@ -253,6 +254,13 @@ services:
       KAFKA_BROKERCONNECT: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://localhost:19092
     depends_on:
       - kafka
+    networks:
+      - tft_network
+
+  metabase:
+    image: metabase/metabase
+    ports:
+      - 3000:3000
     networks:
       - tft_network
 volumes:

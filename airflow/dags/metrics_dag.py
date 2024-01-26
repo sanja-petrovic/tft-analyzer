@@ -13,64 +13,54 @@ with DAG(
         conn_id="tft_spark",
         application="/tft_analyzer/app/batch/aggregate/augment_metrics.py",
         conf={"spark.master": "spark://spark-master:7077"},
-        packages="io.delta:delta-core_2.12:2.2.0",
+        packages="io.delta:delta-core_2.12:2.2.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
     )
     item_metrics = SparkSubmitOperator(
         task_id="item_metrics",
         conn_id="tft_spark",
         application="/tft_analyzer/app/batch/aggregate/item_metrics.py",
         conf={"spark.master": "spark://spark-master:7077"},
-        packages="io.delta:delta-core_2.12:2.2.0",
+        packages="io.delta:delta-core_2.12:2.2.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
     )
     champion_metrics = SparkSubmitOperator(
         task_id="champion_metrics",
         conn_id="tft_spark",
         application="/tft_analyzer/app/batch/aggregate/champion_metrics.py",
         conf={"spark.master": "spark://spark-master:7077"},
-        packages="io.delta:delta-core_2.12:2.2.0",
+        packages="io.delta:delta-core_2.12:2.2.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
     )
     trait_metrics = SparkSubmitOperator(
         task_id="trait_metrics",
         conn_id="tft_spark",
         application="/tft_analyzer/app/batch/aggregate/trait_metrics.py",
         conf={"spark.master": "spark://spark-master:7077"},
-        packages="io.delta:delta-core_2.12:2.2.0",
+        packages="io.delta:delta-core_2.12:2.2.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
     )
     player_metrics = SparkSubmitOperator(
         task_id="player_metrics",
         conn_id="tft_spark",
         application="/tft_analyzer/app/batch/aggregate/player_metrics.py",
         conf={"spark.master": "spark://spark-master:7077"},
-        packages="io.delta:delta-core_2.12:2.2.0",
+        packages="io.delta:delta-core_2.12:2.2.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
     )
     champion_item_metrics = SparkSubmitOperator(
         task_id="champion_item_metrics",
         conn_id="tft_spark",
         application="/tft_analyzer/app/batch/aggregate/champion_item_metrics.py",
         conf={"spark.master": "spark://spark-master:7077"},
-        packages="io.delta:delta-core_2.12:2.2.0",
+        packages="io.delta:delta-core_2.12:2.2.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
     )
     placement_metrics = SparkSubmitOperator(
         task_id="placement_metrics",
         conn_id="tft_spark",
         application="/tft_analyzer/app/batch/aggregate/placement_metrics.py",
         conf={"spark.master": "spark://spark-master:7077"},
-        packages="io.delta:delta-core_2.12:2.2.0",
+        packages="io.delta:delta-core_2.12:2.2.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
     )
     composition_metrics = SparkSubmitOperator(
         task_id="composition_metrics",
         conn_id="tft_spark",
         application="/tft_analyzer/app/batch/aggregate/composition_metrics.py",
         conf={"spark.master": "spark://spark-master:7077"},
-        packages="io.delta:delta-core_2.12:2.2.0",
+        packages="io.delta:delta-core_2.12:2.2.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.1",
     )
-
-(
-    augment_metrics
-    >> item_metrics
-    >> trait_metrics
-    >> champion_item_metrics
-    >> player_metrics
-    >> placement_metrics
-    >> composition_metrics
-)

@@ -1,21 +1,12 @@
-from pyspark.sql.functions import to_date, expr, col, when, lit
+from pyspark.sql.functions import col, expr, rank, desc, sum
+from pyspark.sql.window import Window
+from pyspark.sql.types import DoubleType
 from pyspark.sql import DataFrame, SparkSession
 from typing import Union
-from confluent_kafka.schema_registry import SchemaRegistryClient
-from pyspark.sql.avro.functions import from_avro
 from loguru import logger
-from pyspark.sql.types import StringType
+import time
 
 CHECKPOINT = "hdfs://namenode:9000/user/hive/delta/_checkpoints/"
-SCHEMA_REGISTRY_URL: str = "http://schema-registry:8086"
-
-
-class SchemaRegistry:
-    def __init__(self, url: str = SCHEMA_REGISTRY_URL) -> None:
-        self.client = SchemaRegistryClient({"url": url})
-
-    def get_schema_str(self, subject: str) -> str:
-        return self.client.get_latest_version(subject).schema.schema_str
 
 
 def create_spark() -> SparkSession:
@@ -56,6 +47,25 @@ def create_spark() -> SparkSession:
     )
 
 
+def calculate_transaction_metrics(spark, df):
+    transaction_aggregated_df = df.groupBy(
+        col("product"), expr("window(timestamp, '1 day')").alias("time_window")
+    ).agg(
+        expr("sum(CASE WHEN action = 'buy' THEN 1 ELSE 0 END)").alias(
+            "transaction_count"
+        ),
+        expr("sum(CASE WHEN action = 'buy' THEN rp ELSE null END)").alias(
+            "total_profit"
+        ),
+    )
+
+    transaction_aggregated_df = transaction_aggregated_df.withColumn(
+        "date", expr("date_trunc('day', time_window.start)")
+    )
+
+    return transaction_aggregated_df
+
+
 def read_stream(table: str, spark: SparkSession) -> DataFrame:
     logger.info("Reading from Delta stream...")
     df = spark.readStream.format("delta").table(table)
@@ -67,9 +77,9 @@ def write_stream(
     df: DataFrame, table: str, partition_by: Union[str, None] = None
 ) -> None:
     logger.info("Writing to Delta stream...")
-    df.writeStream.format("delta").outputMode("append").trigger(
+    df.writeStream.format("delta").outputMode("complete").trigger(
         availableNow=True
-    ).option("checkpointLocation", f"{CHECKPOINT}/silver").partitionBy(
+    ).option("checkpointLocation", f"{CHECKPOINT}/gold-transaction").partitionBy(
         partition_by
     ).toTable(
         table
@@ -77,43 +87,8 @@ def write_stream(
     logger.info("Finished writing to Delta stream.")
 
 
-def show(df):
-    query = (
-        df.writeStream.format("console")
-        .outputMode("append")
-        .option("truncate", False)
-        .start()
-    )
-    query.awaitTermination()
-
-
 if __name__ == "__main__":
     spark = create_spark()
-    df = read_stream("bronze.logs", spark)
-    df_transformed = (
-        df.withColumn(
-            "product",
-            when(
-                col("endpoint_path").contains("buy"),
-                expr(
-                    "substring(endpoint_path, instr(endpoint_path, '=') + 1, instr(endpoint_path, '&') - instr(endpoint_path, '=') - 1)"
-                ),
-            ).otherwise(lit(None).cast(StringType())),
-        )
-        .withColumn(
-            "rp",
-            when(
-                col("endpoint_path").contains("buy"),
-                expr("substring(endpoint_path, -4)"),
-            ).otherwise(lit(None).cast(StringType())),
-        )
-        .withColumn(
-            "action",
-            when(col("endpoint_path").contains("game"), lit("game-start"))
-            .when(col("endpoint_path").contains("register"), lit("register"))
-            .when(col("endpoint_path").contains("buy"), lit("transaction"))
-            .otherwise(lit(None).cast(StringType())),
-        )
-        .drop("endpoint_path")
-    )
-    write_stream(df_transformed, "silver.logs", partition_by="date")
+    df = read_stream("silver.logs", spark)
+    transaction_metrics = calculate_transaction_metrics(spark, df)
+    write_stream(transaction_metrics, "gold.transaction_metrics", partition_by="date")
